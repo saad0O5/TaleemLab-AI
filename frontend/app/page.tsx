@@ -1,0 +1,189 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+
+type ComponentType = 'battery' | 'resistor' | 'switch' | 'bulb' | 'ammeter' | 'voltmeter'
+type PredictionKey = 'resistance' | 'voltage'
+type ExampleKey = 'clean_circuit' | 'battery_polarity_unset_example' | 'no_battery_example' | 'incomplete_circuit_example' | 'value_out_of_range_example' | 'ideal_zero_resistance_example'
+
+const exampleLabels: Record<ExampleKey, string> = {
+  clean_circuit: 'Clean circuit',
+  battery_polarity_unset_example: 'Battery polarity unset',
+  no_battery_example: 'No battery',
+  incomplete_circuit_example: 'Incomplete circuit',
+  value_out_of_range_example: 'Value out of range',
+  ideal_zero_resistance_example: 'Ideal zero resistance',
+}
+
+interface Component {
+  id: string
+  type: ComponentType
+  voltage?: number
+  resistance?: number
+  connects_to: string[]
+}
+
+interface ComponentState {
+  id: string
+  type: string
+  current: number
+  voltage: number
+  brightness: number | null
+}
+
+interface SolverResult {
+  current: number
+  voltage: number
+  totalResistance: number | null
+  componentStates: ComponentState[]
+  flags: (string | { type: string; componentId: string; field: string; value: number })[]
+  note: string | null
+}
+
+interface CircuitData {
+  topology: string
+  components: Component[]
+  solverResult: SolverResult
+}
+
+type Prediction = { key: PredictionKey; direction: 'up' | 'down'; before: number }
+
+const componentState = (id: string, type: ComponentType, current: number, voltage: number, brightness: number | null): ComponentState => ({ id, type, current, voltage, brightness })
+
+const mockCircuitExamples: Record<ExampleKey, CircuitData> = {
+  clean_circuit: {
+    topology: 'series',
+    components: [
+      { id: 'battery_1', type: 'battery', voltage: 9, connects_to: ['resistor_1'] },
+      { id: 'resistor_1', type: 'resistor', resistance: 470, connects_to: ['switch_1'] },
+      { id: 'switch_1', type: 'switch', connects_to: ['bulb_1'] },
+      { id: 'bulb_1', type: 'bulb', resistance: 30, connects_to: ['battery_1'] },
+    ],
+    solverResult: { current: 0, voltage: 9, totalResistance: 500, componentStates: [componentState('battery_1', 'battery', 0, 9, null), componentState('resistor_1', 'resistor', 0, 0, null), componentState('switch_1', 'switch', 0, 0, null), componentState('bulb_1', 'bulb', 0, 0, 0)], flags: [], note: null },
+  },
+  battery_polarity_unset_example: { topology: 'series', components: [{ id: 'battery_1', type: 'battery', connects_to: ['resistor_1'] }], solverResult: { current: 0, voltage: 0, totalResistance: null, componentStates: [], flags: ['battery_polarity_unset'], note: 'Set the battery polarity to solve this circuit.' } },
+  no_battery_example: { topology: 'series', components: [{ id: 'resistor_1', type: 'resistor', resistance: 470, connects_to: [] }], solverResult: { current: 0, voltage: 0, totalResistance: 470, componentStates: [], flags: ['no_battery_detected'], note: 'Add a battery to power this circuit.' } },
+  incomplete_circuit_example: { topology: 'series', components: [{ id: 'battery_1', type: 'battery', voltage: 9, connects_to: [] }], solverResult: { current: 0, voltage: 9, totalResistance: null, componentStates: [], flags: ['incomplete_circuit'], note: 'Connect every component to complete the circuit.' } },
+  value_out_of_range_example: { topology: 'series', components: [], solverResult: { current: 0, voltage: 9, totalResistance: null, componentStates: [], flags: [{ type: 'value_out_of_range', componentId: 'resistor_1', field: 'resistance', value: 0 }], note: 'Use a resistance value above zero.' } },
+  ideal_zero_resistance_example: { topology: 'series', components: [{ id: 'battery_1', type: 'battery', voltage: 9, connects_to: ['switch_1'] }, { id: 'switch_1', type: 'switch', connects_to: ['battery_1'] }], solverResult: { current: 1, voltage: 9, totalResistance: 0, componentStates: [componentState('battery_1', 'battery', 1, 9, null), componentState('switch_1', 'switch', 1, 0, null)], flags: ['current_capped_for_display'], note: 'Ideal zero resistance produces a very high current.' } },
+}
+
+const hasFlag = (flags: SolverResult['flags'], flag: string) => flags.some((item) => typeof item === 'string' ? item === flag : item.type === flag)
+
+async function calculateCircuitState(components: Component[]): Promise<SolverResult> {
+  return Promise.resolve().then(() => {
+    const battery = components.find((component) => component.type === 'battery')
+    const resistor = components.find((component) => component.type === 'resistor')
+    const bulb = components.find((component) => component.type === 'bulb')
+    const closed = !components.some((component) => component.type === 'switch')
+    const voltage = battery?.voltage ?? 9
+    const totalResistance = (resistor?.resistance ?? 470) + (bulb?.resistance ?? 30)
+    const current = closed ? Math.min(1, voltage / totalResistance) : 0
+    return { current, voltage, totalResistance, componentStates: components.map((component) => componentState(component.id, component.type, current, component.type === 'battery' ? voltage : current * (component.resistance ?? 0), component.type === 'bulb' ? Math.min(1, current / .2) : null)), flags: totalResistance <= 30 ? ['current_capped_for_display'] : [], note: null }
+  })
+}
+
+async function getExplanation(oldState: SolverResult, newState: SolverResult, prediction: Prediction, answer: string): Promise<string> {
+  return Promise.resolve().then(() => prediction.key === 'resistance' ? `Increasing resistance reduces current, so the bulb dims — that’s Ohm’s Law.` : `Increasing voltage pushes more current through the circuit, making the bulb brighter.`)
+}
+
+function Icon({ type, size = 20 }: { type: string; size?: number }) {
+  const p = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true }
+  if (type === 'battery') return <svg {...p}><path d="M6 8v8M18 5v14M3 11v2M21 10v4M6 12h12" /></svg>
+  if (type === 'resistor') return <svg {...p}><path d="M3 12h4l2-4 3 8 3-8 2 4h4" /></svg>
+  if (type === 'switch') return <svg {...p}><path d="M3 12h6m6 0h6M9 12l5-5" /><circle cx="8" cy="12" r="1" /><circle cx="16" cy="12" r="1" /></svg>
+  if (type === 'bulb') return <svg {...p}><circle cx="12" cy="10" r="6" /><path d="M9 16h6M10 20h4" /></svg>
+  if (type === 'sun') return <svg {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4 12H2m20 0h-2M5 5l1.5 1.5m12 12L20 20M19 5l-1.5 1.5M6.5 17.5 5 19" /></svg>
+  return <svg {...p}><path d="m5 12 4 4L19 6" /></svg>
+}
+
+function CircuitDiagram({ closed, brightness, current }: { closed: boolean; brightness: number; current: number }) {
+  return <div className={`sim-diagram ${closed ? 'is-flowing' : ''}`} style={{ '--pulse-speed': `${Math.max(.18, 2.8 - current * 12)}s` } as React.CSSProperties}>
+    <svg viewBox="0 0 560 300" role="img" aria-label="Interactive rectangular circuit diagram">
+      <path className="circuit-wire" d="M100 70H460V230H100V70" />
+      <g className="node node-battery" transform="translate(100 70)"><path d="M0 0V-31M18 0V-50" /><text x="-4" y="-59">+</text><text x="-22" y="25">battery_1</text></g>
+      <g className="node node-resistor" transform="translate(460 70)"><path d="M-32 0h9l5-11 9 22 9-22 9 11h23" /><text x="-33" y="29">resistor_1</text></g>
+      <g className="node node-switch" transform="translate(460 230)"><path d="M-31 0h11m40 0h11M-20 0l24-19" /><circle cx="-20" cy="0" r="3" /><circle cx="20" cy="0" r="3" /><text x="-26" y="29">switch_1</text></g>
+      <g className="node node-bulb" transform="translate(100 230)"><circle r="22" style={{ fill: `color-mix(in srgb, var(--teal) ${brightness}%, var(--surface))`, filter: brightness ? 'drop-shadow(0 0 9px var(--teal))' : 'none' }} /><path d="M-8 28h16M-5 34h10" /><text x="-23" y="55">bulb_1</text></g>
+    </svg>
+    <div className="diagram-caption"><span className="flow-key" /> {closed ? 'Current is flowing through the circuit' : 'Open switch — no current flow'}</div>
+  </div>
+}
+
+function Stat({ label, value, unit, warning }: { label: string; value: string; unit?: string; warning?: boolean }) {
+  return <div className={`stat-card ${warning ? 'stat-warning' : ''}`}><span>{label}</span><strong>{value}</strong>{unit && <small>{unit}</small>}</div>
+}
+
+export default function Page() {
+  const [voltage, setVoltage] = useState(9)
+  const [resistance, setResistance] = useState(470)
+  const [closed, setClosed] = useState(false)
+  const [prediction, setPrediction] = useState<{ key: PredictionKey; direction: 'up' | 'down'; before: number } | null>(null)
+  const [explanation, setExplanation] = useState<{ correct: boolean; text: string } | null>(null)
+  const [command, setCommand] = useState('')
+  const [commandMessage, setCommandMessage] = useState('')
+  const [selectedExample, setSelectedExample] = useState<ExampleKey>('clean_circuit')
+  const selectedCircuit = mockCircuitExamples[selectedExample]
+  const components = useMemo<Component[]>(() => selectedCircuit.components.map((component) => ({ ...component, connects_to: [...component.connects_to] })), [selectedCircuit])
+  const solverResult = useMemo(() => {
+    const totalResistance = resistance + 30
+    const current = closed ? Math.min(1, voltage / totalResistance) : 0
+    return { current, voltage, totalResistance, componentStates: components.map((component) => componentState(component.id, component.type, current, component.type === 'battery' ? voltage : current * (component.resistance ?? 0), component.type === 'bulb' ? Math.min(1, current / .2) : null)), flags: totalResistance <= 30 ? ['current_capped_for_display'] : [], note: null } satisfies SolverResult
+  }, [closed, components, resistance, voltage])
+  const current = solverResult.current
+  const brightness = Math.round((solverResult.componentStates.find((state) => state.type === 'bulb')?.brightness ?? 0) * 100)
+  const capped = hasFlag(solverResult.flags, 'current_capped_for_display')
+  const change = async (key: PredictionKey, next: number, direction: 'up' | 'down', answer?: string) => {
+    const correctAnswer = key === 'resistance' ? 'down' : 'up'
+    const correct = answer === correctAnswer
+    const oldState = solverResult
+    const nextComponents = components.map((component) => key === 'resistance' && component.type === 'resistor' ? { ...component, resistance: next } : key === 'voltage' && component.type === 'battery' ? { ...component, voltage: next } : component)
+    const newState = await calculateCircuitState(nextComponents)
+    const text = await getExplanation(oldState, newState, { key, direction, before: key === 'resistance' ? resistance : voltage }, answer ?? '')
+    if (key === 'resistance') setResistance(next); else setVoltage(next)
+    setPrediction(null)
+    setExplanation({ correct, text })
+  }
+  const requestChange = (key: PredictionKey, next: number, direction: 'up' | 'down') => setPrediction({ key, direction, before: key === 'resistance' ? resistance : voltage })
+  const selectExample = (key: ExampleKey) => {
+    const example = mockCircuitExamples[key]
+    setSelectedExample(key)
+    setVoltage(example.components.find((component) => component.type === 'battery')?.voltage ?? example.solverResult.voltage ?? 9)
+    setResistance(example.components.find((component) => component.type === 'resistor')?.resistance ?? 470)
+    setClosed(key === 'ideal_zero_resistance_example')
+    setPrediction(null)
+    setExplanation(null)
+    setCommand('')
+    setCommandMessage('')
+  }
+  const applyCommand = () => {
+    const match = command.match(/(\d+(?:\.\d+)?)/)
+    if (!match) { setCommandMessage("I'm not sure what change you're going for — try something like 'set resistance to 150'."); return }
+    const value = Number(match[1])
+    const isResistance = command.toLowerCase().includes('resistance')
+    const isVoltage = command.toLowerCase().includes('voltage') || command.toLowerCase().includes('battery')
+    if (!isResistance && !isVoltage) { setCommandMessage("I'm not sure what change you're going for — try something like 'set resistance to 150'."); return }
+    if (isResistance) { const direction = value > resistance ? 'up' : 'down'; requestChange('resistance', value, direction) }
+    else { const direction = value > voltage ? 'up' : 'down'; requestChange('voltage', value, direction) }
+    setCommandMessage('')
+  }
+  const question = prediction?.key === 'resistance' ? 'What happens to current if you increase resistance?' : 'What happens to current if you increase voltage?'
+  const activeValue = prediction?.key === 'resistance' ? resistance : voltage
+  const predictedNext = prediction ? (prediction.direction === 'up' ? activeValue + 1 : Math.max(1, activeValue - 1)) : activeValue
+
+  return <main className="sim-shell">
+    <header className="topbar"><div className="brand"><span className="brand-mark">∿</span><span>Taleem<span className="brand-accent">Lab</span></span></div><div className="top-actions"><span className="step-label">STEP <b>3</b> OF 3</span><button className="theme-button" onClick={() => document.documentElement.classList.toggle('dark')} aria-label="Toggle theme"><Icon type="sun" size={17} /></button><span className="avatar">AK</span></div></header>
+    <div className="sim-header"><div><p className="eyebrow">CIRCUIT LAB / EXPERIMENT</p><h1>Simulate <span>&amp;</span> explain</h1><p>Change one variable at a time. Predict what will happen, then test your thinking.</p></div><div className="header-tools"><label htmlFor="example-select">MOCK EXAMPLE<select id="example-select" value={selectedExample} onChange={(event) => selectExample(event.target.value as ExampleKey)} aria-label="Choose a mock circuit example">{Object.entries(exampleLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><div className="synced"><Icon type="check" size={15} /> MODEL READY</div></div></div>
+    <div className="sim-layout">
+      <section className="diagram-column"><div className="section-kicker">YOUR CIRCUIT <span>{components.length} COMPONENTS</span></div><CircuitDiagram closed={closed} brightness={brightness} current={current} /><div className="stats-grid"><Stat label="Voltage" value={voltage.toString()} unit="V" /><Stat label="Resistance" value={resistance.toString()} unit="Ω" /><Stat label="Current" value={capped ? 'Very high' : current.toFixed(3)} unit={capped ? 'real components differ' : 'A'} warning={capped} /><Stat label="Brightness" value={brightness.toString()} unit="%" /></div></section>
+      <section className="controls-column"><div className="section-kicker">EXPERIMENT CONTROLS</div>{prediction && <div className="prediction-card"><span className="prediction-label">PREDICT FIRST</span><h2>{question}</h2><div className="answer-grid"><button onClick={() => change(prediction.key, predictedNext, prediction.direction, 'up')}>Increases</button><button onClick={() => change(prediction.key, predictedNext, prediction.direction, 'down')}>Decreases</button><button onClick={() => change(prediction.key, predictedNext, prediction.direction, 'same')}>Stays the same</button></div></div>}
+        <div className="control-card"><label htmlFor="voltage">Battery voltage <output>{voltage} V</output></label><input id="voltage" type="range" min="1" max="24" value={voltage} onChange={(e) => { const n = Number(e.target.value); requestChange('voltage', n, n > voltage ? 'up' : 'down') }} /><div className="range-labels"><span>1V</span><span>24V</span></div></div>
+        <div className="control-card"><label htmlFor="resistance">Resistor resistance <output>{resistance} Ω</output></label><input id="resistance" type="range" min="10" max="1000" value={resistance} onChange={(e) => { const n = Number(e.target.value); requestChange('resistance', n, n > resistance ? 'up' : 'down') }} /><div className="range-labels"><span>10Ω</span><span>1000Ω</span></div></div>
+        <div className="control-card switch-control"><div><label>Switch</label><p>{closed ? 'Closed — current can flow' : 'Open — circuit is off'}</p></div><button className={`literal-switch ${closed ? 'closed' : ''}`} onClick={() => setClosed(!closed)} aria-label="Toggle circuit switch"><span /></button></div>
+        <div className="command-card"><label htmlFor="command">Try a change in words</label><div className="command-row"><input id="command" value={command} onChange={(e) => setCommand(e.target.value)} placeholder="e.g. increase resistance to 200 ohms" /><button className="blue-button" onClick={applyCommand}>Apply</button></div>{commandMessage && <p className="inline-message">{commandMessage}</p>}</div>
+      </section>
+      <aside className="explain-column"><div className="section-kicker">LEARNING NOTES</div>{explanation ? <div className={`explanation-card ${explanation.correct ? 'is-correct' : 'is-learning'}`}><div className="signal">{explanation.correct ? '✓ Nice — you were right' : '△ Not quite — here’s why'}</div><h2>What just happened?</h2><p>{explanation.text}</p></div> : <div className="explanation-card empty-explanation"><span className="note-mark">?</span><h2>What just happened?</h2><p>Make a prediction and change a control to see the physics unfold here.</p></div>}{resistance <= 25 && <div className="did-you-know"><span>∿</span><div><strong>DID YOU KNOW?</strong><p>Real bulbs have their own resistance, even though our ideal circuit starts by assuming zero.</p></div></div>}</aside>
+    </div>
+  </main>
+}
+
