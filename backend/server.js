@@ -6,6 +6,7 @@ const { callVisionModel } = require("./lib/visionModel");
 const { RECOGNITION_PROMPT, parseCircuitRecognitionResponse } = require("./lib/prompts");
 const { solveCircuit } = require("./lib/circuitSolver");
 const { parseCommand } = require("./lib/textCommandParser");
+const { explainChange } = require("./lib/explanations");
 
 const PORT = process.env.PORT || 3000;
 
@@ -53,19 +54,21 @@ function parseRequestBody(req) {
  * @param {string} componentId 
  * @param {string} field 
  * @param {any} newValue 
- * @returns {object} Solver output
+ * @returns {object} Solver output with rule-based explanation
  */
 function applyCircuitChange(circuit, componentId, field, newValue) {
   if (!circuit || !Array.isArray(circuit.components)) {
     throw new Error("Invalid circuit payload: 'components' array is required.");
   }
 
-  const componentExists = circuit.components.some(c => c.id === componentId);
-  if (!componentExists) {
+  const targetComponent = circuit.components.find(c => c.id === componentId);
+  if (!targetComponent) {
     const error = new Error(`Component '${componentId}' was not found in circuit.`);
     error.code = "component_not_found";
     throw error;
   }
+
+  const oldValue = targetComponent[field];
 
   // Create deep copy of circuit to ensure immutability
   const updatedCircuit = {
@@ -79,7 +82,13 @@ function applyCircuitChange(circuit, componentId, field, newValue) {
     })
   };
 
-  return solveCircuit(updatedCircuit);
+  const solverResult = solveCircuit(updatedCircuit);
+  const explanation = explainChange(field, oldValue, newValue);
+
+  return {
+    ...solverResult,
+    explanation
+  };
 }
 
 const server = http.createServer(async (req, res) => {

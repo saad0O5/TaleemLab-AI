@@ -275,6 +275,7 @@
         <div id="solverError" class="error-box"></div>
         <div id="solverOutput" class="output-box">
           <div style="margin-bottom: 8px;"><strong>Simulation Results:</strong> <span class="badge-tag">Calculated</span></div>
+          <div id="resExplanation" style="background:#e0f2fe; color:#0369a1; padding:10px 12px; border-radius:6px; font-weight:600; font-size:13px; margin-bottom:12px; display:none;"></div>
           <div class="metrics-row">
             <div class="metric">
               <div class="metric-label">Total Current</div>
@@ -381,6 +382,17 @@
       document.getElementById('resCurrent').innerText = data.current + " A";
       document.getElementById('resVoltage').innerText = data.voltage + " V";
       document.getElementById('resResistance').innerText = (data.totalResistance !== null ? data.totalResistance + " Ω" : "N/A");
+      
+      const expElem = document.getElementById('resExplanation');
+      if (expElem) {
+        if (data.explanation) {
+          expElem.innerText = "💡 " + data.explanation;
+          expElem.style.display = 'block';
+        } else {
+          expElem.style.display = 'none';
+        }
+      }
+      
       document.getElementById('solverJson').innerText = JSON.stringify(data, null, 2);
       outBox.style.display = 'block';
     }
