@@ -5,6 +5,7 @@ const path = require("path");
 const { callVisionModel } = require("./lib/visionModel");
 const { RECOGNITION_PROMPT, parseCircuitRecognitionResponse } = require("./lib/prompts");
 const { solveCircuit } = require("./lib/circuitSolver");
+const { parseCommand } = require("./lib/textCommandParser");
 
 const PORT = process.env.PORT || 3000;
 
@@ -44,6 +45,41 @@ function parseRequestBody(req) {
     });
     req.on("error", err => reject(err));
   });
+}
+
+/**
+ * Apply a modification to a component field on a copy of the circuit and solve
+ * @param {object} circuit 
+ * @param {string} componentId 
+ * @param {string} field 
+ * @param {any} newValue 
+ * @returns {object} Solver output
+ */
+function applyCircuitChange(circuit, componentId, field, newValue) {
+  if (!circuit || !Array.isArray(circuit.components)) {
+    throw new Error("Invalid circuit payload: 'components' array is required.");
+  }
+
+  const componentExists = circuit.components.some(c => c.id === componentId);
+  if (!componentExists) {
+    const error = new Error(`Component '${componentId}' was not found in circuit.`);
+    error.code = "component_not_found";
+    throw error;
+  }
+
+  // Create deep copy of circuit to ensure immutability
+  const updatedCircuit = {
+    ...circuit,
+    parallel_groups: circuit.parallel_groups ? circuit.parallel_groups.map(g => [...g]) : [],
+    components: circuit.components.map(c => {
+      if (c.id === componentId) {
+        return { ...c, [field]: newValue };
+      }
+      return { ...c };
+    })
+  };
+
+  return solveCircuit(updatedCircuit);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -132,6 +168,98 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // POST /api/apply-change
+  if (pathname === "/api/apply-change" && req.method === "POST") {
+    try {
+      const body = await parseRequestBody(req);
+      const { circuit, componentId, field, newValue } = body || {};
+
+      if (!circuit || !circuit.components || !circuit.topology) {
+        return sendJSON(res, 400, {
+          error: "invalid_circuit_payload",
+          message: "Request body must contain a valid 'circuit' object."
+        });
+      }
+
+      if (!componentId || typeof componentId !== "string") {
+        return sendJSON(res, 400, {
+          error: "missing_component_id",
+          message: "Request body must contain a string 'componentId'."
+        });
+      }
+
+      if (!field || typeof field !== "string") {
+        return sendJSON(res, 400, {
+          error: "missing_field",
+          message: "Request body must contain a string 'field' to update."
+        });
+      }
+
+      if (newValue === undefined) {
+        return sendJSON(res, 400, {
+          error: "missing_new_value",
+          message: "Request body must contain 'newValue'."
+        });
+      }
+
+      const result = applyCircuitChange(circuit, componentId, field, newValue);
+      return sendJSON(res, 200, result);
+    } catch (err) {
+      if (err.code === "component_not_found") {
+        return sendJSON(res, 400, {
+          error: "component_not_found",
+          message: err.message
+        });
+      }
+      return sendJSON(res, 500, {
+        error: "apply_change_error",
+        message: err.message
+      });
+    }
+  }
+
+  // POST /api/text-command
+  if (pathname === "/api/text-command" && req.method === "POST") {
+    try {
+      const body = await parseRequestBody(req);
+      const { circuit, text } = body || {};
+
+      if (!circuit || !circuit.components || !circuit.topology) {
+        return sendJSON(res, 400, {
+          error: "invalid_circuit_payload",
+          message: "Request body must contain a valid 'circuit' object."
+        });
+      }
+
+      if (!text || typeof text !== "string") {
+        return sendJSON(res, 400, {
+          error: "missing_text",
+          message: "Request body must contain a 'text' command string."
+        });
+      }
+
+      const parsedCmd = parseCommand(text, circuit);
+      if (!parsedCmd || parsedCmd.recognized === false) {
+        return sendJSON(res, 200, { recognized: false });
+      }
+
+      const { componentId, field, newValue } = parsedCmd;
+      const result = applyCircuitChange(circuit, componentId, field, newValue);
+      return sendJSON(res, 200, result);
+    } catch (err) {
+      if (err.code === "component_not_found") {
+        return sendJSON(res, 400, {
+          error: "component_not_found",
+          message: err.message
+        });
+      }
+      return sendJSON(res, 500, {
+        error: "text_command_error",
+        message: err.message
+      });
+    }
+  }
+
   // Serve Interactive Test UI for GET / or GET /index.html
   if (pathname === "/" || pathname === "/index.html") {
     const htmlPath = path.join(__dirname, "public", "index.html");
@@ -151,6 +279,8 @@ if (require.main === module) {
     console.log(`⚡ TaleemLab Backend Server running on http://localhost:${PORT}`);
     console.log(`- POST /api/recognize-circuit`);
     console.log(`- POST /api/solve-circuit`);
+    console.log(`- POST /api/apply-change`);
+    console.log(`- POST /api/text-command`);
     console.log(`- GET  /api/health`);
     console.log(`======================================================\n`);
   });
