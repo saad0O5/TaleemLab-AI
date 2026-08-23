@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { CircuitComponent, CircuitData, SolverResult, ComponentState, SolverFlag } from '../lib/types'
 import { recognizeCircuit, solveCircuit, applyChange, sendTextCommand } from '../lib/api'
 
@@ -99,6 +99,7 @@ function Stat({ label, value, unit, warning }: { label: string; value: string; u
 }
 
 export default function Page() {
+  const [view, setView] = useState<'capture' | 'confirm' | 'simulate'>('capture')
   const [voltage, setVoltage] = useState(9)
   const [resistance, setResistance] = useState(470)
   const [closed, setClosed] = useState(false)
@@ -106,17 +107,15 @@ export default function Page() {
   const [explanation, setExplanation] = useState<{ correct: boolean; text: string } | null>(null)
   const [command, setCommand] = useState('')
   const [commandMessage, setCommandMessage] = useState('')
-  const [selectedExample, setSelectedExample] = useState<ExampleKey>('clean_circuit')
+  const [selectedExample, setSelectedExample] = useState<ExampleKey | 'custom'>('clean_circuit')
   
   const [circuit, setCircuit] = useState<CircuitData | null>(null)
   const [solverResult, setSolverResult] = useState<SolverResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Load initial clean_circuit example on mount
-  useEffect(() => {
-    selectExample('clean_circuit')
-  }, [])
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const selectExample = async (key: ExampleKey) => {
     setSelectedExample(key)
@@ -139,11 +138,46 @@ export default function Page() {
       setExplanation(null)
       setCommand('')
       setCommandMessage('')
+      setView('simulate')
     } catch (err: any) {
       setError(err.message || 'Failed to solve example circuit.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setLoading(true)
+    setError('')
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try {
+        const base64 = reader.result as string
+        const recognized = await recognizeCircuit(base64)
+        const solved = await solveCircuit(recognized)
+        
+        setCircuit(recognized)
+        setSolverResult(solved)
+        setSelectedExample('custom')
+        
+        const bat = recognized.components.find(c => c.type === 'battery')
+        const resis = recognized.components.find(c => c.type === 'resistor')
+        const sw = recognized.components.find(c => c.type === 'switch')
+        setVoltage(bat?.voltage ?? 9)
+        setResistance(resis?.resistance ?? 470)
+        setClosed(sw?.state === 'closed')
+        
+        setView('confirm')
+      } catch (err: any) {
+        setError(err.message || 'Failed to process circuit image.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    reader.readAsDataURL(file)
   }
 
   const current = solverResult?.current ?? 0
@@ -261,9 +295,161 @@ export default function Page() {
   const activeValue = prediction?.key === 'resistance' ? resistance : voltage
   const predictedNext = prediction ? (prediction.direction === 'up' ? activeValue + 1 : Math.max(1, activeValue - 1)) : activeValue
 
+  // CAPTURE VIEW
+  if (view === 'capture') {
+    return <main className="sim-shell">
+      <header className="topbar">
+        <div className="brand"><span className="brand-mark">∿</span><span>Taleem<span className="brand-accent">Lab</span></span></div>
+        <div className="top-actions">
+          <button className="theme-button" onClick={() => document.documentElement.classList.toggle('dark')} aria-label="Toggle theme"><Icon type="sun" size={17} /></button>
+          <span className="avatar">AK</span>
+        </div>
+      </header>
+      <div className="sim-header">
+        <div>
+          <p className="eyebrow">GET STARTED</p>
+          <h1>Capture <span>&amp;</span> analyze</h1>
+          <p>Bring your hand-drawn DC circuit diagrams to life. Upload or take a photo to analyze it, or try a sample circuit.</p>
+        </div>
+      </div>
+      <div style={{ maxWidth: '600px', margin: '30px auto', padding: '0 20px', display: 'grid', gap: '20px' }}>
+        {error && (
+          <div style={{ padding: '15px', background: 'var(--surface)', borderLeft: '4px solid var(--danger)', color: 'var(--foreground)', fontSize: '14px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+        
+        <input 
+          type="file" 
+          accept="image/*" 
+          capture="environment" 
+          ref={cameraInputRef} 
+          style={{ display: 'none' }} 
+          onChange={handleFileChange}
+        />
+        <input 
+          type="file" 
+          accept="image/*" 
+          ref={fileInputRef} 
+          style={{ display: 'none' }} 
+          onChange={handleFileChange}
+        />
+
+        <button 
+          className="blue-button"
+          style={{ height: '54px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+          onClick={() => cameraInputRef.current?.click()}
+          disabled={loading}
+        >
+          {loading ? 'Analyzing...' : '📷 Capture circuit'}
+        </button>
+        
+        <button 
+          className="literal-switch"
+          style={{ height: '54px', width: '100%', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: 'var(--surface)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={loading}
+        >
+          📁 Upload a photo
+        </button>
+
+        {loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '20px' }}>
+            <div style={{ width: '40px', height: '40px', border: '4px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <span style={{ fontSize: '14px', color: 'var(--muted)' }}>Analyzing your circuit diagram...</span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '20px' }}>
+          <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>or</span>
+          <button 
+            style={{ border: 0, background: 'none', color: 'var(--primary)', fontWeight: '800', textDecoration: 'underline', cursor: 'pointer' }}
+            onClick={() => selectExample('clean_circuit')}
+            disabled={loading}
+          >
+            Try a sample circuit
+          </button>
+        </div>
+      </div>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </main>
+  }
+
+  // CONFIRM VIEW PLACEHOLDER
+  if (view === 'confirm') {
+    return <main className="sim-shell">
+      <header className="topbar">
+        <div className="brand"><span className="brand-mark">∿</span><span>Taleem<span className="brand-accent">Lab</span></span></div>
+        <div className="top-actions">
+          <button className="theme-button" onClick={() => document.documentElement.classList.toggle('dark')} aria-label="Toggle theme"><Icon type="sun" size={17} /></button>
+          <span className="avatar">AK</span>
+        </div>
+      </header>
+      <div className="sim-header">
+        <div>
+          <p className="eyebrow">STEP 2 OF 3</p>
+          <h1>Confirm <span>&amp;</span> Correct</h1>
+          <p>Review the recognized circuit configuration before starting the simulation.</p>
+        </div>
+      </div>
+      <div style={{ maxWidth: '600px', margin: '30px auto', padding: '0 20px', display: 'grid', gap: '20px' }}>
+        <div style={{ padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <h3>Components list placeholder</h3>
+          <p>Recognized components count: {circuit?.components.length}</p>
+        </div>
+        <button 
+          className="blue-button" 
+          style={{ height: '54px', fontSize: '16px' }}
+          onClick={() => setView('simulate')}
+        >
+          Looks good, continue
+        </button>
+      </div>
+    </main>
+  }
+
+  // SIMULATE VIEW
   return <main className="sim-shell">
-    <header className="topbar"><div className="brand"><span className="brand-mark">∿</span><span>Taleem<span className="brand-accent">Lab</span></span></div><div className="top-actions"><span className="step-label">STEP <b>3</b> OF 3</span><button className="theme-button" onClick={() => document.documentElement.classList.toggle('dark')} aria-label="Toggle theme"><Icon type="sun" size={17} /></button><span className="avatar">AK</span></div></header>
-    <div className="sim-header"><div><p className="eyebrow">CIRCUIT LAB / EXPERIMENT</p><h1>Simulate <span>&amp;</span> explain</h1><p>Change one variable at a time. Predict what will happen, then test your thinking.</p></div><div className="header-tools"><label htmlFor="example-select">MOCK EXAMPLE<select id="example-select" value={selectedExample} onChange={(event) => selectExample(event.target.value as ExampleKey)} aria-label="Choose a mock circuit example">{Object.entries(exampleLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><div className="synced"><Icon type="check" size={15} /> MODEL READY</div></div></div>
+    <header className="topbar">
+      <div className="brand"><span className="brand-mark">∿</span><span>Taleem<span className="brand-accent">Lab</span></span></div>
+      <div className="top-actions">
+        <span className="step-label">STEP <b>3</b> OF 3</span>
+        <button className="theme-button" onClick={() => document.documentElement.classList.toggle('dark')} aria-label="Toggle theme"><Icon type="sun" size={17} /></button>
+        <span className="avatar">AK</span>
+      </div>
+    </header>
+    <div className="sim-header">
+      <div>
+        <p className="eyebrow">CIRCUIT LAB / EXPERIMENT</p>
+        <h1>Simulate <span>&amp;</span> explain</h1>
+        <p>Change one variable at a time. Predict what will happen, then test your thinking.</p>
+      </div>
+      <div className="header-tools">
+        {selectedExample !== 'custom' ? (
+          <label htmlFor="example-select">
+            MOCK EXAMPLE
+            <select id="example-select" value={selectedExample} onChange={(event) => selectExample(event.target.value as ExampleKey)} aria-label="Choose a mock circuit example">
+              {Object.entries(exampleLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+          </label>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--muted)' }}>CUSTOM CAPTURED CIRCUIT</span>
+            <button 
+              style={{ border: 0, background: 'none', color: 'var(--primary)', fontWeight: '800', textDecoration: 'underline', fontSize: '12px' }} 
+              onClick={() => setView('capture')}
+            >
+              📷 Capture New
+            </button>
+          </div>
+        )}
+        <div className="synced"><Icon type="check" size={15} /> MODEL READY</div>
+      </div>
+    </div>
     {error && <div className="max-w-7xl mx-auto px-7 mb-4"><div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded"><strong>Error:</strong> {error}</div></div>}
     <div className="sim-layout">
       <section className="diagram-column"><div className="section-kicker">YOUR CIRCUIT <span>{circuit?.components.length || 0} COMPONENTS</span></div><CircuitDiagram closed={closed} brightness={brightness} current={current} /><div className="stats-grid"><Stat label="Voltage" value={voltage.toString()} unit="V" /><Stat label="Resistance" value={resistance.toString()} unit="Ω" /><Stat label="Current" value={capped ? 'Very high' : current.toFixed(3)} unit={capped ? 'real components differ' : 'A'} warning={capped} /><Stat label="Brightness" value={brightness.toString()} unit="%" /></div></section>
