@@ -131,6 +131,14 @@
       border-radius: 6px;
       width: auto;
     }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
     textarea {
       width: 100%;
       font-family: monospace;
@@ -208,9 +216,9 @@
 <body>
   <div class="container">
     <header>
-      <div class="badge">Day 1 Backend Active</div>
+      <div class="badge">Backend Active</div>
       <h1>⚡ TaleemLab Backend &amp; Simulation Engine</h1>
-      <p class="subtitle">AI Hand-Drawn Circuit Recognition (Gemini Vision) &amp; Deterministic DC Circuit Solver</p>
+      <p class="subtitle">AI Circuit Recognition, Deterministic Solver &amp; Natural Language Control</p>
     </header>
 
     <div class="grid">
@@ -237,25 +245,37 @@
         </div>
       </section>
 
-      <!-- Section 2: Solver -->
+      <!-- Section 2: Solver & Interactive Commands -->
       <section class="card">
         <div class="card-header">
           <span class="step-num">2</span>
-          <h2>Circuit Solver &amp; Simulation</h2>
+          <h2>Solver, Change &amp; Text Commands</h2>
         </div>
-        <p class="card-desc">Calculate physics metrics via <code>POST /api/solve-circuit</code></p>
+        <p class="card-desc">Test <code>POST /api/solve-circuit</code>, <code>/api/apply-change</code> &amp; <code>/api/text-command</code></p>
 
         <div class="btn-row">
           <button class="btn-secondary" onclick="loadPreset('series')">Load Series</button>
           <button class="btn-secondary" onclick="loadPreset('series_parallel')">Load Series-Parallel</button>
         </div>
 
-        <textarea id="circuitJsonArea" rows="11"></textarea>
-        <button id="btnSolve" onclick="runSolver()">🔬 Solve Circuit</button>
+        <textarea id="circuitJsonArea" rows="8"></textarea>
+        
+        <div style="margin-bottom: 12px;">
+          <label style="font-size: 12px; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">
+            Natural Language Command (POST /api/text-command):
+          </label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="cmdTextInput" placeholder="e.g. 'increase resistance to 200' or 'open switch'" />
+            <button style="width: auto; padding: 0 16px; margin-bottom: 12px;" onclick="runTextCommand()">Run Command</button>
+          </div>
+        </div>
+
+        <button id="btnSolve" onclick="runSolver()">🔬 Solve Circuit Directly</button>
 
         <div id="solverError" class="error-box"></div>
         <div id="solverOutput" class="output-box">
           <div style="margin-bottom: 8px;"><strong>Simulation Results:</strong> <span class="badge-tag">Calculated</span></div>
+          <div id="resExplanation" style="background:#e0f2fe; color:#0369a1; padding:10px 12px; border-radius:6px; font-weight:600; font-size:13px; margin-bottom:12px; display:none;"></div>
           <div class="metrics-row">
             <div class="metric">
               <div class="metric-label">Total Current</div>
@@ -357,6 +377,26 @@
       }
     }
 
+    function renderSolverOutput(data) {
+      const outBox = document.getElementById('solverOutput');
+      document.getElementById('resCurrent').innerText = data.current + " A";
+      document.getElementById('resVoltage').innerText = data.voltage + " V";
+      document.getElementById('resResistance').innerText = (data.totalResistance !== null ? data.totalResistance + " Ω" : "N/A");
+      
+      const expElem = document.getElementById('resExplanation');
+      if (expElem) {
+        if (data.explanation) {
+          expElem.innerText = "💡 " + data.explanation;
+          expElem.style.display = 'block';
+        } else {
+          expElem.style.display = 'none';
+        }
+      }
+      
+      document.getElementById('solverJson').innerText = JSON.stringify(data, null, 2);
+      outBox.style.display = 'block';
+    }
+
     async function runSolver() {
       const errBox = document.getElementById('solverError');
       const outBox = document.getElementById('solverOutput');
@@ -383,11 +423,46 @@
           errBox.innerText = JSON.stringify(data, null, 2);
           errBox.style.display = 'block';
         } else {
-          document.getElementById('resCurrent').innerText = data.current + " A";
-          document.getElementById('resVoltage').innerText = data.voltage + " V";
-          document.getElementById('resResistance').innerText = (data.totalResistance !== null ? data.totalResistance + " Ω" : "N/A");
-          document.getElementById('solverJson').innerText = JSON.stringify(data, null, 2);
-          outBox.style.display = 'block';
+          renderSolverOutput(data);
+        }
+      } catch (err) {
+        errBox.innerText = err.message;
+        errBox.style.display = 'block';
+      }
+    }
+
+    async function runTextCommand() {
+      const text = document.getElementById('cmdTextInput').value.trim();
+      if (!text) return;
+      const errBox = document.getElementById('solverError');
+      const outBox = document.getElementById('solverOutput');
+      errBox.style.display = 'none';
+      outBox.style.display = 'none';
+
+      let parsedCircuit;
+      try {
+        parsedCircuit = JSON.parse(document.getElementById('circuitJsonArea').value);
+      } catch (err) {
+        errBox.innerText = "Invalid JSON in circuit area: " + err.message;
+        errBox.style.display = 'block';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/text-command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ circuit: parsedCircuit, text })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errBox.innerText = JSON.stringify(data, null, 2);
+          errBox.style.display = 'block';
+        } else if (data.recognized === false) {
+          errBox.innerText = "Command not recognized: \"" + text + "\"";
+          errBox.style.display = 'block';
+        } else {
+          renderSolverOutput(data);
         }
       } catch (err) {
         errBox.innerText = err.message;
