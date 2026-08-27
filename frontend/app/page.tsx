@@ -1,110 +1,33 @@
 'use client'
 
-import { useMemo, useState, useEffect, useRef } from 'react'
-import { CircuitComponent, CircuitData, SolverResult, ComponentState, SolverFlag } from '../lib/types'
-import { recognizeCircuit, solveCircuit, applyChange, sendTextCommand } from '../lib/api'
-
-type PredictionKey = 'resistance' | 'voltage'
-type ExampleKey = 'clean_circuit' | 'battery_polarity_unset_example' | 'no_battery_example' | 'incomplete_circuit_example' | 'value_out_of_range_example' | 'ideal_zero_resistance_example'
-
-const exampleLabels: Record<ExampleKey, string> = {
-  clean_circuit: 'Clean circuit',
-  battery_polarity_unset_example: 'Battery polarity unset',
-  no_battery_example: 'No battery',
-  incomplete_circuit_example: 'Incomplete circuit',
-  value_out_of_range_example: 'Value out of range',
-  ideal_zero_resistance_example: 'Ideal zero resistance',
-}
-
-const mockCircuitExamples: Record<ExampleKey, CircuitData> = {
-  clean_circuit: {
-    topology: 'series',
-    parallel_groups: [],
-    components: [
-      { id: 'battery_1', type: 'battery', voltage: 9, polarity: 'same', connects_to: ['resistor_1'] },
-      { id: 'resistor_1', type: 'resistor', resistance: 470, connects_to: ['switch_1'] },
-      { id: 'switch_1', type: 'switch', state: 'open', connects_to: ['bulb_1'] },
-      { id: 'bulb_1', type: 'bulb', resistance: 30, connects_to: ['battery_1'] },
-    ],
-  },
-  battery_polarity_unset_example: {
-    topology: 'series',
-    parallel_groups: [],
-    components: [
-      { id: 'battery_1', type: 'battery', voltage: 9, connects_to: ['resistor_1'] },
-      { id: 'battery_2', type: 'battery', voltage: 9, connects_to: ['resistor_1'] },
-      { id: 'resistor_1', type: 'resistor', resistance: 470, connects_to: [] },
-    ],
-  },
-  no_battery_example: {
-    topology: 'series',
-    parallel_groups: [],
-    components: [
-      { id: 'resistor_1', type: 'resistor', resistance: 470, connects_to: [] },
-    ],
-  },
-  incomplete_circuit_example: {
-    topology: 'series',
-    parallel_groups: [],
-    components: [
-      { id: 'battery_1', type: 'battery', voltage: 9, polarity: 'same', connects_to: [] },
-    ],
-  },
-  value_out_of_range_example: {
-    topology: 'series',
-    parallel_groups: [],
-    components: [
-      { id: 'battery_1', type: 'battery', voltage: 9, polarity: 'same', connects_to: ['resistor_1'] },
-      { id: 'resistor_1', type: 'resistor', resistance: -10, connects_to: [] },
-    ],
-  },
-  ideal_zero_resistance_example: {
-    topology: 'series',
-    parallel_groups: [],
-    components: [
-      { id: 'battery_1', type: 'battery', voltage: 9, polarity: 'same', connects_to: ['switch_1'] },
-      { id: 'switch_1', type: 'switch', state: 'closed', connects_to: ['battery_1'] },
-    ],
-  },
-}
+import { useState, useRef } from 'react'
+import { CircuitComponent, CircuitData, SolverResult, SolverFlag, View, PredictionKey, Prediction, Explanation } from '../lib/types'
+import { recognizeCircuit, solveCircuit, applyChange, sendTextCommand, TextCommandResult } from '../lib/api'
+import { ExampleKey, mockCircuitExamples } from '../lib/exampleCircuits'
+import { CaptureScreen } from '../components/screens/CaptureScreen'
+import { ConfirmScreen } from '../components/screens/ConfirmScreen'
+import { SimulateScreen } from '../components/screens/SimulateScreen'
+import { CameraModal } from '../components/camera/CameraModal'
 
 const hasFlag = (flags: SolverFlag[] | undefined, flag: string) =>
   flags ? flags.some((item) => typeof item === 'string' ? item === flag : item.type === flag) : false
 
-function Icon({ type, size = 20 }: { type: string; size?: number }) {
-  const p = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true }
-  if (type === 'battery') return <svg {...p}><path d="M6 8v8M18 5v14M3 11v2M21 10v4M6 12h12" /></svg>
-  if (type === 'resistor') return <svg {...p}><path d="M3 12h4l2-4 3 8 3-8 2 4h4" /></svg>
-  if (type === 'switch') return <svg {...p}><path d="M3 12h6m6 0h6M9 12l5-5" /><circle cx="8" cy="12" r="1" /><circle cx="16" cy="12" r="1" /></svg>
-  if (type === 'bulb') return <svg {...p}><circle cx="12" cy="10" r="6" /><path d="M9 16h6M10 20h4" /></svg>
-  if (type === 'sun') return <svg {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4 12H2m20 0h-2M5 5l1.5 1.5m12 12L20 20M19 5l-1.5 1.5M6.5 17.5 5 19" /></svg>
-  return <svg {...p}><path d="m5 12 4 4L19 6" /></svg>
-}
-
-function CircuitDiagram({ closed, brightness, current }: { closed: boolean; brightness: number; current: number }) {
-  return <div className={`sim-diagram ${closed ? 'is-flowing' : ''}`} style={{ '--pulse-speed': `${Math.max(.18, 2.8 - current * 12)}s` } as React.CSSProperties}>
-    <svg viewBox="0 0 560 300" role="img" aria-label="Interactive rectangular circuit diagram">
-      <path className="circuit-wire" d="M100 70H460V230H100V70" />
-      <g className="node node-battery" transform="translate(100 70)"><path d="M0 0V-31M18 0V-50" /><text x="-4" y="-59">+</text><text x="-22" y="25">battery_1</text></g>
-      <g className="node node-resistor" transform="translate(460 70)"><path d="M-32 0h9l5-11 9 22 9-22 9 11h23" /><text x="-33" y="29">resistor_1</text></g>
-      <g className="node node-switch" transform="translate(460 230)"><path d="M-31 0h11m40 0h11M-20 0l24-19" /><circle cx="-20" cy="0" r="3" /><circle cx="20" cy="0" r="3" /><text x="-26" y="29">switch_1</text></g>
-      <g className="node node-bulb" transform="translate(100 230)"><circle r="22" style={{ fill: `color-mix(in srgb, var(--teal) ${brightness}%, var(--surface))`, filter: brightness ? 'drop-shadow(0 0 9px var(--teal))' : 'none' }} /><path d="M-8 28h16M-5 34h10" /><text x="-23" y="55">bulb_1</text></g>
-    </svg>
-    <div className="diagram-caption"><span className="flow-key" /> {closed ? 'Current is flowing through the circuit' : 'Open switch — no current flow'}</div>
-  </div>
-}
-
-function Stat({ label, value, unit, warning }: { label: string; value: string; unit?: string; warning?: boolean }) {
-  return <div className={`stat-card ${warning ? 'stat-warning' : ''}`}><span>{label}</span><strong>{value}</strong>{unit && <small>{unit}</small>}</div>
+const hasBlockingFlags = (flags: SolverFlag[] | undefined) => {
+  if (!flags) return false
+  const blocking = ['battery_polarity_unset', 'no_battery_detected', 'incomplete_circuit']
+  return flags.some(f => {
+    if (typeof f === 'string') return blocking.includes(f)
+    return f.type === 'value_out_of_range'
+  })
 }
 
 export default function Page() {
-  const [view, setView] = useState<'capture' | 'confirm' | 'simulate'>('capture')
+  const [view, setView] = useState<View>('capture')
   const [voltage, setVoltage] = useState(9)
   const [resistance, setResistance] = useState(470)
   const [closed, setClosed] = useState(false)
-  const [prediction, setPrediction] = useState<{ key: PredictionKey; direction: 'up' | 'down'; before: number } | null>(null)
-  const [explanation, setExplanation] = useState<{ correct: boolean; text: string } | null>(null)
+  const [prediction, setPrediction] = useState<Prediction | null>(null)
+  const [explanation, setExplanation] = useState<Explanation | null>(null)
   const [command, setCommand] = useState('')
   const [commandMessage, setCommandMessage] = useState('')
   const [selectedExample, setSelectedExample] = useState<ExampleKey | 'custom'>('clean_circuit')
@@ -113,8 +36,8 @@ export default function Page() {
   const [solverResult, setSolverResult] = useState<SolverResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [cameraOpen, setCameraOpen] = useState(false)
 
-  const cameraInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const selectExample = async (key: ExampleKey) => {
@@ -129,18 +52,46 @@ export default function Page() {
       
       const bat = ex.components.find(c => c.type === 'battery')
       const resis = ex.components.find(c => c.type === 'resistor')
+      const bulb = ex.components.find(c => c.type === 'bulb')
       const sw = ex.components.find(c => c.type === 'switch')
       setVoltage(bat?.voltage ?? 9)
-      setResistance(resis?.resistance ?? 470)
+      setResistance(resis?.resistance ?? bulb?.resistance ?? 470)
       setClosed(sw?.state === 'closed')
       
       setPrediction(null)
       setExplanation(null)
       setCommand('')
       setCommandMessage('')
-      setView('simulate')
+      setView(hasBlockingFlags(res.flags) ? 'confirm' : 'simulate')
     } catch (err: any) {
       setError(err.message || 'Failed to solve example circuit.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const processImage = async (base64: string) => {
+    setLoading(true)
+    setError('')
+    try {
+      const recognized = await recognizeCircuit(base64)
+      const solved = await solveCircuit(recognized)
+      
+      setCircuit(recognized)
+      setSolverResult(solved)
+      setSelectedExample('custom')
+      
+      const bat = recognized.components.find(c => c.type === 'battery')
+      const resis = recognized.components.find(c => c.type === 'resistor')
+      const bulb = recognized.components.find(c => c.type === 'bulb')
+      const sw = recognized.components.find(c => c.type === 'switch')
+      setVoltage(bat?.voltage ?? 9)
+      setResistance(resis?.resistance ?? bulb?.resistance ?? 470)
+      setClosed(sw?.state === 'closed')
+      
+      setView('confirm')
+    } catch (err: any) {
+      setError(err.message || 'Failed to process circuit image.')
     } finally {
       setLoading(false)
     }
@@ -150,34 +101,33 @@ export default function Page() {
     const file = e.target.files?.[0]
     if (!file) return
     
-    setLoading(true)
-    setError('')
     const reader = new FileReader()
     reader.onload = async () => {
-      try {
-        const base64 = reader.result as string
-        const recognized = await recognizeCircuit(base64)
-        const solved = await solveCircuit(recognized)
-        
-        setCircuit(recognized)
-        setSolverResult(solved)
-        setSelectedExample('custom')
-        
-        const bat = recognized.components.find(c => c.type === 'battery')
-        const resis = recognized.components.find(c => c.type === 'resistor')
-        const sw = recognized.components.find(c => c.type === 'switch')
-        setVoltage(bat?.voltage ?? 9)
-        setResistance(resis?.resistance ?? 470)
-        setClosed(sw?.state === 'closed')
-        
-        setView('confirm')
-      } catch (err: any) {
-        setError(err.message || 'Failed to process circuit image.')
-      } finally {
-        setLoading(false)
-      }
+      await processImage(reader.result as string)
     }
     reader.readAsDataURL(file)
+  }
+
+  const startCapture = async () => {
+    let hasCamera = false
+    try {
+      if (navigator.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        hasCamera = devices.some((d) => d.kind === 'videoinput')
+      }
+    } catch {}
+    if (hasCamera) setCameraOpen(true)
+    else fileInputRef.current?.click()
+  }
+
+  const handleCameraCapture = (imageBase64: string) => {
+    setCameraOpen(false)
+    processImage(imageBase64)
+  }
+
+  const handleCameraFallback = () => {
+    setCameraOpen(false)
+    fileInputRef.current?.click()
   }
 
   const updateComponentValue = async (componentId: string, field: string, value: any) => {
@@ -247,38 +197,85 @@ export default function Page() {
     }
   }
 
-  const current = solverResult?.current ?? 0
-  const brightness = Math.round((solverResult?.componentStates?.find((state) => state.type === 'bulb')?.brightness ?? 0) * 100)
-  const capped = hasFlag(solverResult?.flags, 'current_capped_for_display')
-
-  const change = async (key: PredictionKey, next: number, direction: 'up' | 'down', answer?: string) => {
+  const autoCompleteCircuit = async () => {
     if (!circuit) return
-    const correctAnswer = key === 'resistance' ? 'down' : 'up'
-    const correct = answer === correctAnswer
+    
+    // Connect components in a series loop to complete the circuit
+    const updatedComponents = circuit.components.map((c, i) => {
+      const nextIndex = (i + 1) % circuit.components.length
+      return {
+        ...c,
+        connects_to: [circuit.components[nextIndex].id]
+      }
+    })
+    
+    const updatedCircuit: CircuitData = {
+      ...circuit,
+      components: updatedComponents
+    }
     
     setLoading(true)
     setError('')
     try {
-      const compType = key === 'resistance' ? 'resistor' : 'battery'
-      const component = circuit.components.find(c => c.type === compType)
-      if (!component) throw new Error(`No ${compType} component found in the circuit.`)
+      const res = await solveCircuit(updatedCircuit)
+      setCircuit(updatedCircuit)
+      setSolverResult(res)
+    } catch (err: any) {
+      setError(err.message || 'Failed to auto-complete circuit.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const current = solverResult?.current ?? 0
+  const brightness = Math.round((solverResult?.componentStates?.find((state) => state.type === 'bulb')?.brightness ?? 0) * 100)
+  const capped = hasFlag(solverResult?.flags, 'current_capped_for_display')
+
+  const change = async (key: PredictionKey, next: any, direction: 'up' | 'down', answer?: string) => {
+    if (!circuit) return
+    const correctAnswer = key === 'resistance'
+      ? (direction === 'up' ? 'down' : 'up')
+      : (direction === 'up' ? 'up' : 'down')
+    const correct = answer === correctAnswer
       
-      const res = await applyChange(circuit, component.id, key, next)
-      
+    setLoading(true)
+    setError('')
+    try {
+      let component: CircuitComponent | undefined
+      if (key === 'state') {
+        component = circuit.components.find(c => c.type === 'switch')
+      } else {
+        const compType = key === 'resistance' ? 'resistor' : 'battery'
+        component = circuit.components.find(c => c.type === compType)
+          || (compType === 'resistor' ? circuit.components.find(c => c.type === 'bulb') : undefined)
+      }
+      if (!component) throw new Error(`No component found for ${key} change.`)
+        
+      const field = key === 'state' ? 'state' : key
+      const res = await applyChange(circuit, component.id, field, next)
+        
       const updatedComponents = circuit.components.map(c => {
-        if (c.id === component.id) {
-          return { ...c, [key]: next }
+        if (c.id === component!.id) {
+          return { ...c, [field]: next }
         }
         return c
       })
       const updatedCircuit = { ...circuit, components: updatedComponents }
-      
+        
       setCircuit(updatedCircuit)
       setSolverResult(res)
-      
-      if (key === 'resistance') setResistance(next); else setVoltage(next)
+        
+      if (key === 'resistance') setResistance(next as number)
+      else if (key === 'voltage') setVoltage(next as number)
+      else if (key === 'state') setClosed(next === 'closed')
       setPrediction(null)
-      setExplanation({ correct, text: res.explanation || (key === 'resistance' ? `Increasing resistance reduces current, so the bulb dims — that’s Ohm’s Law.` : `Increasing voltage pushes more current through the circuit, making the bulb brighter.`) })
+      const directionWord = direction === 'up' ? 'Increasing' : 'Decreasing'
+      const fallbackText = key === 'resistance'
+        ? `${directionWord} resistance ${direction === 'up' ? 'reduces' : 'increases'} current — that's Ohm's Law.`
+        : key === 'voltage'
+        ? `${directionWord} voltage ${direction === 'up' ? 'pushes more current through' : 'reduces current in'} the circuit.`
+        : `The switch is now ${next}. Current ${next === 'closed' ? 'flows' : 'stops'}.`
+      setExplanation({ correct, text: res.explanation || fallbackText })
     } catch (err: any) {
       setError(err.message || 'Failed to apply change.')
     } finally {
@@ -286,70 +283,56 @@ export default function Page() {
     }
   }
 
-  const requestChange = (key: PredictionKey, next: number, direction: 'up' | 'down') => setPrediction({ key, direction, before: key === 'resistance' ? resistance : voltage })
+  const requestChange = (key: PredictionKey, next: any, direction: 'up' | 'down', componentId?: string) => {
+    setPrediction({
+      key,
+      direction,
+      before: key === 'resistance' ? resistance : key === 'voltage' ? voltage : undefined,
+      target: key === 'state' ? undefined : next,
+      componentId,
+    })
+  }
 
   const toggleSwitch = async () => {
     if (!circuit) return
     const sw = circuit.components.find(c => c.type === 'switch')
     if (!sw) return
     
-    const nextState = closed ? 'open' : 'closed'
-    setLoading(true)
-    setError('')
-    try {
-      const res = await applyChange(circuit, sw.id, 'state', nextState)
-      const updatedComponents = circuit.components.map(c => {
-        if (c.id === sw.id) {
-          return { ...c, state: nextState }
-        }
-        return c
-      })
-      setCircuit({ ...circuit, components: updatedComponents })
-      setSolverResult(res)
-      setClosed(!closed)
-    } catch (err: any) {
-      setError(err.message || 'Failed to toggle switch.')
-    } finally {
-      setLoading(false)
-    }
+    const nextState: 'open' | 'closed' = closed ? 'open' : 'closed'
+    const direction = nextState === 'closed' ? 'up' : 'down'
+    
+    requestChange('state', nextState, direction, sw.id)
   }
 
   const applyCommand = async () => {
     if (!circuit) return
-    const match = command.match(/(\d+(?:\.\d+)?)/)
-    if (!match) { setCommandMessage("I'm not sure what change you're going for — try something like 'set resistance to 150'."); return }
-    const value = Number(match[1])
-    const isResistance = command.toLowerCase().includes('resistance')
-    const isVoltage = command.toLowerCase().includes('voltage') || command.toLowerCase().includes('battery')
-    if (!isResistance && !isVoltage) { setCommandMessage("I'm not sure what change you're going for — try something like 'set resistance to 150'."); return }
-    
     setLoading(true)
     setCommandMessage('')
     try {
       const res = await sendTextCommand(circuit, command)
       if ('recognized' in res && res.recognized === false) {
-        setCommandMessage("I'm not sure what change you're going for — try something like 'set resistance to 150'.")
-      } else {
-        const solverRes = res as SolverResult
-        setSolverResult(solverRes)
-        
-        const changedKey = isResistance ? 'resistance' : 'voltage'
-        const direction = value > (changedKey === 'resistance' ? resistance : voltage) ? 'up' : 'down'
-        
-        const compType = isResistance ? 'resistor' : 'battery'
-        const component = circuit.components.find(c => c.type === compType)
-        if (component) {
-          const updatedComponents = circuit.components.map(c => {
-            if (c.id === component.id) {
-              return { ...c, [changedKey]: value }
-            }
-            return c
-          })
-          setCircuit({ ...circuit, components: updatedComponents })
-        }
-        
-        requestChange(changedKey, value, direction)
+        setCommandMessage("I'm not sure what change you're going for — try something like 'set resistance to 150' or 'open switch'.")
         setCommand('')
+      } else {
+        // postJSON throws on 4xx/5xx, so value_out_of_bounds errors land in
+        // the catch block below (via err.message) — no separate error branch needed here.
+        const solverRes = res as TextCommandResult
+        const appliedChange = solverRes.appliedChange
+
+        if (appliedChange) {
+          const key = appliedChange.field as PredictionKey
+          let direction: 'up' | 'down'
+          
+          if (key === 'state') {
+            direction = appliedChange.newValue === 'closed' ? 'up' : 'down'
+          } else {
+            const oldValue = key === 'resistance' ? resistance : voltage
+            direction = appliedChange.newValue > oldValue ? 'up' : 'down'
+          }
+          
+          requestChange(key, appliedChange.newValue, direction, appliedChange.componentId)
+          setCommand('')
+        }
       }
     } catch (err: any) {
       setCommandMessage(err.message || 'Failed to process command.')
@@ -358,346 +341,77 @@ export default function Page() {
     }
   }
 
-  const question = prediction?.key === 'resistance' ? 'What happens to current if you increase resistance?' : 'What happens to current if you increase voltage?'
-  const activeValue = prediction?.key === 'resistance' ? resistance : voltage
-  const predictedNext = prediction ? (prediction.direction === 'up' ? activeValue + 1 : Math.max(1, activeValue - 1)) : activeValue
+  const question = prediction
+    ? prediction.key === 'state'
+      ? `What happens to current if you ${prediction.direction === 'up' ? 'close' : 'open'} the switch?`
+      : `What happens to current if you ${prediction.direction === 'up' ? 'increase' : 'decrease'} ${prediction.key}?`
+    : ''
+  const activeValue = prediction?.key === 'resistance' ? resistance : prediction?.key === 'voltage' ? voltage : 0
+  const predictedNext = prediction
+    ? prediction.key === 'state'
+      ? (prediction.direction === 'up' ? 'closed' : 'open')
+      : (prediction.target ?? (prediction.direction === 'up' ? activeValue + 1 : Math.max(1, activeValue - 1)))
+    : activeValue
 
   // CAPTURE VIEW
   if (view === 'capture') {
-    return <main className="sim-shell">
-      <header className="topbar">
-        <div className="brand"><span className="brand-mark">∿</span><span>Taleem<span className="brand-accent">Lab</span></span></div>
-        <div className="top-actions">
-          <button className="theme-button" onClick={() => document.documentElement.classList.toggle('dark')} aria-label="Toggle theme"><Icon type="sun" size={17} /></button>
-          <span className="avatar">AK</span>
-        </div>
-      </header>
-      <div className="sim-header">
-        <div>
-          <p className="eyebrow">GET STARTED</p>
-          <h1>Capture <span>&amp;</span> analyze</h1>
-          <p>Bring your hand-drawn DC circuit diagrams to life. Upload or take a photo to analyze it, or try a sample circuit.</p>
-        </div>
-      </div>
-      <div style={{ maxWidth: '600px', margin: '30px auto', padding: '0 20px', display: 'grid', gap: '20px' }}>
-        {error && (
-          <div style={{ padding: '15px', background: 'var(--surface)', borderLeft: '4px solid var(--danger)', color: 'var(--foreground)', fontSize: '14px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-        
-        <input 
-          type="file" 
-          accept="image/*" 
-          capture="environment" 
-          ref={cameraInputRef} 
-          style={{ display: 'none' }} 
-          onChange={handleFileChange}
+    return <>
+      <CaptureScreen
+        error={error}
+        loading={loading}
+        fileInputRef={fileInputRef}
+        onFileChange={handleFileChange}
+        onCapture={startCapture}
+        onSelectExample={selectExample}
+      />
+      {cameraOpen && (
+        <CameraModal
+          onCapture={handleCameraCapture}
+          onClose={() => setCameraOpen(false)}
+          onFallback={handleCameraFallback}
         />
-        <input 
-          type="file" 
-          accept="image/*" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          onChange={handleFileChange}
-        />
-
-        <button 
-          className="blue-button"
-          style={{ height: '54px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
-          onClick={() => cameraInputRef.current?.click()}
-          disabled={loading}
-        >
-          {loading ? 'Analyzing...' : '📷 Capture circuit'}
-        </button>
-        
-        <button 
-          className="literal-switch"
-          style={{ height: '54px', width: '100%', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: 'var(--surface)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
-          onClick={() => fileInputRef.current?.click()}
-          disabled={loading}
-        >
-          📁 Upload a photo
-        </button>
-
-        {loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '20px' }}>
-            <div style={{ width: '40px', height: '40px', border: '4px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-            <span style={{ fontSize: '14px', color: 'var(--muted)' }}>Analyzing your circuit diagram...</span>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '20px' }}>
-          <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1px' }}>or</span>
-          <button 
-            style={{ border: 0, background: 'none', color: 'var(--primary)', fontWeight: '800', textDecoration: 'underline', cursor: 'pointer' }}
-            onClick={() => selectExample('clean_circuit')}
-            disabled={loading}
-          >
-            Try a sample circuit
-          </button>
-        </div>
-      </div>
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-    </main>
+      )}
+    </>
   }
 
   // CONFIRM VIEW
   if (view === 'confirm') {
-    const flags = solverResult?.flags || []
-    const hasPolarityUnset = flags.some(f => f === 'battery_polarity_unset')
-    const hasNoBattery = flags.some(f => f === 'no_battery_detected')
-    const hasIncomplete = flags.some(f => f === 'incomplete_circuit')
-    
-    const outOfRangeFlags = flags.filter((f): f is { type: 'value_out_of_range'; componentId: string; field: string; value: number } => 
-      typeof f === 'object' && f.type === 'value_out_of_range'
-    )
-    const hasOutOfRange = outOfRangeFlags.length > 0
-    
-    const canContinue = !hasPolarityUnset && !hasNoBattery && !hasIncomplete && !hasOutOfRange
-
-    return <main className="sim-shell">
-      <header className="topbar">
-        <div className="brand"><span className="brand-mark">∿</span><span>Taleem<span className="brand-accent">Lab</span></span></div>
-        <div className="top-actions">
-          <button className="theme-button" onClick={() => document.documentElement.classList.toggle('dark')} aria-label="Toggle theme"><Icon type="sun" size={17} /></button>
-          <span className="avatar">AK</span>
-        </div>
-      </header>
-      
-      <div className="sim-header">
-        <div>
-          <p className="eyebrow">STEP 2 OF 3</p>
-          <h1>Confirm <span>&amp;</span> Correct</h1>
-          <p>Review the recognized circuit configuration below. Adjust components or values to fix any issues.</p>
-        </div>
-        <button 
-          onClick={() => setView('capture')}
-          style={{ border: 0, background: 'none', color: 'var(--muted)', fontWeight: '800', textDecoration: 'underline', cursor: 'pointer', fontSize: '13px' }}
-        >
-          ← Retake Photo
-        </button>
-      </div>
-
-      <div style={{ maxWidth: '700px', margin: '30px auto', padding: '0 20px', display: 'grid', gap: '20px' }}>
-        {error && (
-          <div style={{ padding: '15px', background: 'var(--surface)', borderLeft: '4px solid var(--danger)', color: 'var(--foreground)', fontSize: '14px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-
-        {/* Warning messages */}
-        {hasPolarityUnset && (
-          <div style={{ padding: '15px', background: 'var(--surface)', borderLeft: '4px solid var(--warning)', color: 'var(--foreground)', fontSize: '14px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <strong>Polarity Unset:</strong> Please set the orientation for all batteries.
-          </div>
-        )}
-        {hasNoBattery && (
-          <div style={{ padding: '15px', background: 'var(--surface)', borderLeft: '4px solid var(--danger)', color: 'var(--foreground)', fontSize: '14px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span><strong>No Power Source:</strong> No power source detected.</span>
-            <button 
-              onClick={addBattery}
-              className="blue-button"
-              style={{ padding: '5px 12px', fontSize: '12px' }}
-            >
-              + Add Battery
-            </button>
-          </div>
-        )}
-        {hasIncomplete && (
-          <div style={{ padding: '15px', background: 'var(--surface)', borderLeft: '4px solid var(--warning)', color: 'var(--foreground)', fontSize: '14px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <strong>Incomplete Loop:</strong> This circuit isn't complete — check for a break in the connections.
-          </div>
-        )}
-        {hasOutOfRange && (
-          <div style={{ padding: '15px', background: 'var(--surface)', borderLeft: '4px solid var(--warning)', color: 'var(--foreground)', fontSize: '14px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <strong>Value Warning:</strong> One or more fields have values out of range. Check highlighted fields.
-          </div>
-        )}
-
-        {/* Component list */}
-        <div style={{ border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--surface)', overflow: 'hidden' }}>
-          <div style={{ padding: '12px 15px', background: 'var(--background)', borderBottom: '1px solid var(--border)', fontWeight: '800', fontSize: '11px', color: 'var(--muted)', letterSpacing: '1px', textTransform: 'uppercase' }}>
-            Recognized Components ({circuit?.components.length || 0})
-          </div>
-          <div style={{ display: 'grid' }}>
-            {circuit?.components.map((c) => {
-              const voltageFlag = outOfRangeFlags.some(f => f.componentId === c.id && f.field === 'voltage')
-              const resistanceFlag = outOfRangeFlags.some(f => f.componentId === c.id && f.field === 'resistance')
-              
-              return (
-                <div key={c.id} style={{ padding: '15px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyBetween: 'space-between', borderBottom: '1px solid var(--border)', gap: '15px', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ padding: '8px', background: 'var(--surface-soft)', borderRadius: '4px', color: 'var(--primary)', display: 'flex', alignItems: 'center' }}>
-                      <Icon type={c.type} size={20} />
-                    </span>
-                    <div>
-                      <span style={{ fontWeight: '800', fontSize: '14px' }}>{c.id}</span>
-                      <span style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>{c.type}</span>
-                    </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    {(c.type === 'resistor' || c.type === 'bulb') && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 'bold' }}>Resistance:</label>
-                        <input
-                          type="number"
-                          style={{ width: '90px', padding: '4px 8px', textAlign: 'right', fontSize: '13px', border: resistanceFlag ? '2px solid var(--danger)' : '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', borderRadius: '3px' }}
-                          value={c.resistance ?? ''}
-                          onChange={(e) => updateComponentValue(c.id, 'resistance', Number(e.target.value))}
-                        />
-                        <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Ω</span>
-                      </div>
-                    )}
-
-                    {c.type === 'battery' && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '15px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <label style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 'bold' }}>Voltage:</label>
-                          <input
-                            type="number"
-                            style={{ width: '75px', padding: '4px 8px', textAlign: 'right', fontSize: '13px', border: voltageFlag ? '2px solid var(--danger)' : '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', borderRadius: '3px' }}
-                            value={c.voltage ?? ''}
-                            onChange={(e) => updateComponentValue(c.id, 'voltage', Number(e.target.value))}
-                          />
-                          <span style={{ fontSize: '12px', color: 'var(--muted)' }}>V</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <label style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 'bold' }}>Direction:</label>
-                          <button
-                            type="button"
-                            className="literal-switch"
-                            style={{ 
-                              height: '28px', 
-                              width: '120px', 
-                              fontSize: '11px', 
-                              padding: '0 8px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: c.polarity === 'reversed' ? 'rgba(240, 68, 56, 0.1)' : c.polarity === 'same' ? 'rgba(18, 183, 106, 0.1)' : 'var(--surface-soft)', 
-                              color: c.polarity === 'reversed' ? 'var(--danger)' : c.polarity === 'same' ? 'var(--success)' : 'var(--muted)', 
-                              border: '1px solid var(--border)',
-                              borderRadius: '3px',
-                              fontWeight: 'bold',
-                              clipPath: 'none'
-                            }}
-                            onClick={() => updateComponentValue(c.id, 'polarity', c.polarity === 'same' ? 'reversed' : 'same')}
-                          >
-                            {c.polarity === 'reversed' ? 'Reversed (–/+)' : c.polarity === 'same' ? 'Same (+/–)' : 'Unset'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {c.type === 'switch' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <label style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 'bold' }}>State:</label>
-                        <button
-                          type="button"
-                          className="literal-switch"
-                          style={{ 
-                            height: '28px', 
-                            width: '80px', 
-                            fontSize: '11px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: c.state === 'closed' ? 'rgba(21, 94, 239, 0.1)' : 'var(--surface-soft)', 
-                            color: c.state === 'closed' ? 'var(--primary)' : 'var(--muted)', 
-                            border: '1px solid var(--border)',
-                            borderRadius: '3px',
-                            fontWeight: 'bold',
-                            clipPath: 'none'
-                          }}
-                          onClick={() => updateComponentValue(c.id, 'state', c.state === 'closed' ? 'open' : 'closed')}
-                        >
-                          {c.state === 'closed' ? 'Closed' : 'Open'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Action Button */}
-        {canContinue ? (
-          <button
-            onClick={() => setView('simulate')}
-            className="blue-button"
-            style={{ height: '54px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--success)' }}
-          >
-            ✓ Looks good, continue
-          </button>
-        ) : (
-          <button
-            disabled
-            className="literal-switch"
-            style={{ height: '54px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-soft)', color: 'var(--muted)', border: '1px solid var(--border)', cursor: 'not-allowed' }}
-          >
-            Please resolve circuit warnings to continue
-          </button>
-        )}
-      </div>
-    </main>
+    return <ConfirmScreen
+      circuit={circuit}
+      solverResult={solverResult}
+      error={error}
+      onUpdateComponentValue={updateComponentValue}
+      onAddBattery={addBattery}
+      onAutoCompleteCircuit={autoCompleteCircuit}
+      onViewChange={setView}
+    />
   }
 
   // SIMULATE VIEW
-  return <main className="sim-shell">
-    <header className="topbar">
-      <div className="brand"><span className="brand-mark">∿</span><span>Taleem<span className="brand-accent">Lab</span></span></div>
-      <div className="top-actions">
-        <span className="step-label">STEP <b>3</b> OF 3</span>
-        <button className="theme-button" onClick={() => document.documentElement.classList.toggle('dark')} aria-label="Toggle theme"><Icon type="sun" size={17} /></button>
-        <span className="avatar">AK</span>
-      </div>
-    </header>
-    <div className="sim-header">
-      <div>
-        <p className="eyebrow">CIRCUIT LAB / EXPERIMENT</p>
-        <h1>Simulate <span>&amp;</span> explain</h1>
-        <p>Change one variable at a time. Predict what will happen, then test your thinking.</p>
-      </div>
-      <div className="header-tools">
-        {selectedExample !== 'custom' ? (
-          <label htmlFor="example-select">
-            MOCK EXAMPLE
-            <select id="example-select" value={selectedExample} onChange={(event) => selectExample(event.target.value as ExampleKey)} aria-label="Choose a mock circuit example">
-              {Object.entries(exampleLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-            </select>
-          </label>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--muted)' }}>CUSTOM CAPTURED CIRCUIT</span>
-            <button 
-              style={{ border: 0, background: 'none', color: 'var(--primary)', fontWeight: '800', textDecoration: 'underline', fontSize: '12px' }} 
-              onClick={() => setView('capture')}
-            >
-              📷 Capture New
-            </button>
-          </div>
-        )}
-        <div className="synced"><Icon type="check" size={15} /> MODEL READY</div>
-      </div>
-    </div>
-    {error && <div className="max-w-7xl mx-auto px-7 mb-4"><div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded"><strong>Error:</strong> {error}</div></div>}
-    <div className="sim-layout">
-      <section className="diagram-column"><div className="section-kicker">YOUR CIRCUIT <span>{circuit?.components.length || 0} COMPONENTS</span></div><CircuitDiagram closed={closed} brightness={brightness} current={current} /><div className="stats-grid"><Stat label="Voltage" value={voltage.toString()} unit="V" /><Stat label="Resistance" value={resistance.toString()} unit="Ω" /><Stat label="Current" value={capped ? 'Very high' : current.toFixed(3)} unit={capped ? 'real components differ' : 'A'} warning={capped} /><Stat label="Brightness" value={brightness.toString()} unit="%" /></div></section>
-      <section className="controls-column"><div className="section-kicker">EXPERIMENT CONTROLS</div>{prediction && <div className="prediction-card"><span className="prediction-label">PREDICT FIRST</span><h2>{question}</h2><div className="answer-grid"><button onClick={() => change(prediction.key, predictedNext, prediction.direction, 'up')}>Increases</button><button onClick={() => change(prediction.key, predictedNext, prediction.direction, 'down')}>Decreases</button><button onClick={() => change(prediction.key, predictedNext, prediction.direction, 'same')}>Stays the same</button></div></div>}
-        <div className="control-card"><label htmlFor="voltage">Battery voltage <output>{voltage} V</output></label><input id="voltage" type="range" min="1" max="24" value={voltage} onChange={(e) => { const n = Number(e.target.value); requestChange('voltage', n, n > voltage ? 'up' : 'down') }} /><div className="range-labels"><span>1V</span><span>24V</span></div></div>
-        <div className="control-card"><label htmlFor="resistance">Resistor resistance <output>{resistance} Ω</output></label><input id="resistance" type="range" min="10" max="1000" value={resistance} onChange={(e) => { const n = Number(e.target.value); requestChange('resistance', n, n > resistance ? 'up' : 'down') }} /><div className="range-labels"><span>10Ω</span><span>1000Ω</span></div></div>
-        <div className="control-card switch-control"><div><label>Switch</label><p>{closed ? 'Closed — current can flow' : 'Open — circuit is off'}</p></div><button className={`literal-switch ${closed ? 'closed' : ''}`} onClick={toggleSwitch} aria-label="Toggle circuit switch"><span /></button></div>
-        <div className="command-card"><label htmlFor="command">Try a change in words</label><div className="command-row"><input id="command" value={command} onChange={(e) => setCommand(e.target.value)} placeholder="e.g. increase resistance to 200 ohms" /><button className="blue-button" onClick={applyCommand}>Apply</button></div>{commandMessage && <p className="inline-message">{commandMessage}</p>}</div>
-      </section>
-      <aside className="explain-column"><div className="section-kicker">LEARNING NOTES</div>{explanation ? <div className={`explanation-card ${explanation.correct ? 'is-correct' : 'is-learning'}`}><div className="signal">{explanation.correct ? '✓ Nice — you were right' : '△ Not quite — here’s why'}</div><h2>What just happened?</h2><p>{explanation.text}</p></div> : <div className="explanation-card empty-explanation"><span className="note-mark">?</span><h2>What just happened?</h2><p>Make a prediction and change a control to see the physics unfold here.</p></div>}{resistance <= 25 && <div className="did-you-know"><span>∿</span><div><strong>DID YOU KNOW?</strong><p>Real bulbs have their own resistance, even though our ideal circuit starts by assuming zero.</p></div></div>}</aside>
-    </div>
-  </main>
+  return <SimulateScreen
+    selectedExample={selectedExample}
+    circuit={circuit}
+    componentStates={solverResult?.componentStates ?? []}
+    solverFlags={solverResult?.flags ?? []}
+    error={error}
+    voltage={voltage}
+    resistance={resistance}
+    closed={closed}
+    current={current}
+    brightness={brightness}
+    capped={capped}
+    prediction={prediction}
+    question={question}
+    predictedNext={predictedNext}
+    command={command}
+    commandMessage={commandMessage}
+    explanation={explanation}
+    onSelectExample={selectExample}
+    onViewChange={setView}
+    onChangeValue={change}
+    onRequestChange={requestChange}
+    onToggleSwitch={toggleSwitch}
+    onCommandInputChange={setCommand}
+    onApplyCommand={applyCommand}
+  />
 }

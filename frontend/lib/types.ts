@@ -40,3 +40,26 @@ export interface SolverResult {
   note: string | null;
   explanation?: string;
 }
+
+export type View = "capture" | "confirm" | "simulate";
+
+export type PredictionKey = "resistance" | "voltage" | "state";
+
+export interface Prediction {
+  key: PredictionKey;
+  direction: "up" | "down";
+  before?: number;
+  target?: number;
+  componentId?: string;
+}
+
+export interface Explanation {
+  correct: boolean;
+  text: string;
+}
+
+// Sanity limits for circuit values - must match backend/lib/circuitSolver.js
+export const SANITY_LIMITS = {
+  resistance: { min: 0, max: 10000 },  // ohms
+  voltage: { min: 0, max: 100 }        // volts
+};

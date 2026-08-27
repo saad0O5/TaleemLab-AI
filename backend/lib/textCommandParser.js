@@ -13,13 +13,13 @@ function parseNumberValue(valStr) {
   const trimmed = valStr.trim().toLowerCase();
 
   // Check for k / kohm suffix like "1k", "2.2k", "1kohm"
-  const kMatch = trimmed.match(/^([0-9]+(?:\.[0-9]+)?)\s*k(?:ohm|ohms|Ω)?$/i);
+  const kMatch = trimmed.match(/^(-?[0-9]+(?:\.[0-9]+)?)\s*k(?:ohm|ohms|Ω)?$/i);
   if (kMatch) {
     return parseFloat(kMatch[1]) * 1000;
   }
 
   // Check for standard number (strip trailing v, volt, volts, ohm, ohms, Ω)
-  const numMatch = trimmed.match(/^([0-9]+(?:\.[0-9]+)?)/);
+  const numMatch = trimmed.match(/^(-?[0-9]+(?:\.[0-9]+)?)/);
   if (numMatch) {
     return parseFloat(numMatch[1]);
   }
@@ -89,8 +89,8 @@ function parseCommand(text, circuit = null) {
   }
 
   // 2. Resistance patterns: "set/increase/decrease resistance to [number]"
-  const resistanceMatch = cleanText.match(/\b(?:set|increase|decrease|change|make|adjust)\b.*?(?:resistance|resistor|\br\b)(?:.*?\b(?:of|for)\b\s*([a-z0-9_]+))?.*?(?:to|at|by|=)\s*([0-9]+(?:\.[0-9]+)?\s*(?:k(?:ohm|ohms|Ω)?|ohm|ohms|Ω)?)/i)
-    || cleanText.match(/(?:resistance|resistor)\s*(?:of\s*([a-z0-9_]+)\s*)?(?:to|=)\s*([0-9]+(?:\.[0-9]+)?\s*(?:k(?:ohm|ohms|Ω)?|ohm|ohms|Ω)?)/i);
+  const resistanceMatch = cleanText.match(/\b(?:set|increase|decrease|change|make|adjust)\b.*?(?:resistance|resistor|\br\b)(?:.*?\b(?:of|for)\b\s*([a-z0-9_]+))?.*?(?:to|at|by|=)\s*(-?[0-9]+(?:\.[0-9]+)?\s*(?:k(?:ohm|ohms|Ω)?|ohm|ohms|Ω)?)/i)
+    || cleanText.match(/(?:resistance|resistor)\s*(?:of\s*([a-z0-9_]+)\s*)?(?:to|=)\s*(-?[0-9]+(?:\.[0-9]+)?\s*(?:k(?:ohm|ohms|Ω)?|ohm|ohms|Ω)?)/i);
 
   if (resistanceMatch) {
     const rawVal = resistanceMatch[2] || resistanceMatch[1];
@@ -109,8 +109,8 @@ function parseCommand(text, circuit = null) {
   }
 
   // 3. Voltage patterns: "set/increase/decrease voltage to [number]"
-  const voltageMatch = cleanText.match(/\b(?:set|increase|decrease|change|make|adjust)\b.*?(?:voltage|battery|\bv\b)(?:.*?\b(?:of|for)\b\s*([a-z0-9_]+))?.*?(?:to|at|by|=)\s*([0-9]+(?:\.[0-9]+)?\s*(?:v|volts|volt)?)/i)
-    || cleanText.match(/(?:voltage|battery)\s*(?:of\s*([a-z0-9_]+)\s*)?(?:to|=)\s*([0-9]+(?:\.[0-9]+)?\s*(?:v|volts|volt)?)/i);
+  const voltageMatch = cleanText.match(/\b(?:set|increase|decrease|change|make|adjust)\b.*?(?:voltage|battery|\bv\b)(?:.*?\b(?:of|for)\b\s*([a-z0-9_]+))?.*?(?:to|at|by|=)\s*(-?[0-9]+(?:\.[0-9]+)?\s*(?:v|volts|volt)?)/i)
+    || cleanText.match(/(?:voltage|battery)\s*(?:of\s*([a-z0-9_]+)\s*)?(?:to|=)\s*(-?[0-9]+(?:\.[0-9]+)?\s*(?:v|volts|volt)?)/i);
 
   if (voltageMatch) {
     const rawVal = voltageMatch[2] || voltageMatch[1];

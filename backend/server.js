@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { callVisionModel } = require("./lib/visionModel");
 const { RECOGNITION_PROMPT, parseCircuitRecognitionResponse } = require("./lib/prompts");
-const { solveCircuit } = require("./lib/circuitSolver");
+const { solveCircuit, SANITY_LIMITS } = require("./lib/circuitSolver");
 const { parseCommand } = require("./lib/textCommandParser");
 const { explainChange } = require("./lib/explanations");
 
@@ -70,6 +70,10 @@ function applyCircuitChange(circuit, componentId, field, newValue) {
 
   const oldValue = targetComponent[field];
 
+  // Solve the original circuit to get the old current for context
+  const originalResult = solveCircuit(circuit);
+  const oldCurrent = originalResult.current;
+
   // Create deep copy of circuit to ensure immutability
   const updatedCircuit = {
     ...circuit,
@@ -83,7 +87,8 @@ function applyCircuitChange(circuit, componentId, field, newValue) {
   };
 
   const solverResult = solveCircuit(updatedCircuit);
-  const explanation = explainChange(field, oldValue, newValue);
+  const newCurrent = solverResult.current;
+  const explanation = explainChange(field, oldValue, newValue, { oldCurrent, newCurrent });
 
   return {
     ...solverResult,
@@ -212,6 +217,50 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
+      // Validate against SANITY_LIMITS before solving
+      if (field === 'resistance') {
+        const numVal = Number(newValue);
+        if (isNaN(numVal)) {
+          return sendJSON(res, 400, {
+            error: "invalid_value",
+            message: "Resistance must be a number."
+          });
+        }
+        if (numVal < SANITY_LIMITS.resistance.min) {
+          return sendJSON(res, 400, {
+            error: "value_out_of_bounds",
+            message: "Resistance can't be negative — resistors always oppose current flow, they can't push it."
+          });
+        }
+        if (numVal > SANITY_LIMITS.resistance.max) {
+          return sendJSON(res, 400, {
+            error: "value_out_of_bounds",
+            message: "That's higher than this simulator supports — try a value under 10,000 ohms."
+          });
+        }
+      }
+      if (field === 'voltage') {
+        const numVal = Number(newValue);
+        if (isNaN(numVal)) {
+          return sendJSON(res, 400, {
+            error: "invalid_value",
+            message: "Voltage must be a number."
+          });
+        }
+        if (numVal < SANITY_LIMITS.voltage.min) {
+          return sendJSON(res, 400, {
+            error: "value_out_of_bounds",
+            message: "Voltage can't be negative in this simulator — it represents the battery's push, always positive here."
+          });
+        }
+        if (numVal > SANITY_LIMITS.voltage.max) {
+          return sendJSON(res, 400, {
+            error: "value_out_of_bounds",
+            message: "That's higher than a typical classroom circuit — try a value under 100 volts."
+          });
+        }
+      }
+
       const result = applyCircuitChange(circuit, componentId, field, newValue);
       return sendJSON(res, 200, result);
     } catch (err) {
@@ -254,8 +303,56 @@ const server = http.createServer(async (req, res) => {
       }
 
       const { componentId, field, newValue } = parsedCmd;
+
+      // Validate against SANITY_LIMITS before solving
+      if (field === 'resistance') {
+        const numVal = Number(newValue);
+        if (isNaN(numVal)) {
+          return sendJSON(res, 400, {
+            error: "invalid_value",
+            message: "Resistance must be a number."
+          });
+        }
+        if (numVal < SANITY_LIMITS.resistance.min) {
+          return sendJSON(res, 400, {
+            error: "value_out_of_bounds",
+            message: "Resistance can't be negative — resistors always oppose current flow, they can't push it."
+          });
+        }
+        if (numVal > SANITY_LIMITS.resistance.max) {
+          return sendJSON(res, 400, {
+            error: "value_out_of_bounds",
+            message: "That's higher than this simulator supports — try a value under 10,000 ohms."
+          });
+        }
+      }
+      if (field === 'voltage') {
+        const numVal = Number(newValue);
+        if (isNaN(numVal)) {
+          return sendJSON(res, 400, {
+            error: "invalid_value",
+            message: "Voltage must be a number."
+          });
+        }
+        if (numVal < SANITY_LIMITS.voltage.min) {
+          return sendJSON(res, 400, {
+            error: "value_out_of_bounds",
+            message: "Voltage can't be negative in this simulator — it represents the battery's push, always positive here."
+          });
+        }
+        if (numVal > SANITY_LIMITS.voltage.max) {
+          return sendJSON(res, 400, {
+            error: "value_out_of_bounds",
+            message: "That's higher than a typical classroom circuit — try a value under 100 volts."
+          });
+        }
+      }
+
       const result = applyCircuitChange(circuit, componentId, field, newValue);
-      return sendJSON(res, 200, result);
+      return sendJSON(res, 200, {
+        ...result,
+        appliedChange: { componentId, field, newValue }
+      });
     } catch (err) {
       if (err.code === "component_not_found") {
         return sendJSON(res, 400, {

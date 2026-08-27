@@ -2,6 +2,10 @@ import { CircuitData, SolverResult } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
+export interface TextCommandResult extends SolverResult {
+  appliedChange?: { componentId: string; field: string; newValue: any };
+}
+
 async function postJSON<T>(path: string, body: object): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     method: "POST",
@@ -45,6 +49,6 @@ export async function applyChange(
 export async function sendTextCommand(
   circuit: CircuitData,
   text: string
-): Promise<SolverResult | { recognized: false }> {
-  return postJSON<SolverResult | { recognized: false }>("/api/text-command", { circuit, text });
+): Promise<TextCommandResult | { recognized: false }> {
+  return postJSON<TextCommandResult | { recognized: false }>("/api/text-command", { circuit, text });
 }

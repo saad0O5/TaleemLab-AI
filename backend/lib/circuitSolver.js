@@ -115,9 +115,16 @@ function solveCircuit(circuit) {
   // group actually gets, when multiple groups sit in series with each other.
   const groupEquivalentResistance = {}; // groupIndex -> Req
 
-  if (topology === "series") {
+  // If topology is labeled "series" but parallel_groups are present, treat as
+  // series_parallel — a component listed in parallel_groups is meaningfully
+  // parallel regardless of the topology label (e.g. voltmeter across a resistor).
+  const effectiveTopology = (topology === "series" && circuit.parallel_groups && circuit.parallel_groups.length > 0)
+    ? "series_parallel"
+    : topology;
+
+  if (effectiveTopology === "series") {
     totalResistance = resistiveElements.reduce((sum, c) => sum + c.resistance, 0);
-  } else if (topology === "series_parallel") {
+  } else if (effectiveTopology === "series_parallel") {
     const groups = circuit.parallel_groups || [];
     const groupedIds = new Set(groups.flat());
 
@@ -136,7 +143,7 @@ function solveCircuit(circuit) {
 
     totalResistance = parallelContribution + seriesContribution;
   } else {
-    throw new Error(`Unsupported topology: ${topology}`);
+    throw new Error(`Unsupported topology: ${effectiveTopology}`);
   }
 
   let effectiveResistance = totalResistance;
