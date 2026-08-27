@@ -68,14 +68,15 @@ export function ConfirmScreen({ circuit, solverResult, error, onUpdateComponentV
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button
               onClick={onAddBattery}
-              className="blue-button"
-              style={{ padding: '8px 16px', fontSize: '13px' }}
+              className="blue-button confirm-action"
+              style={{ padding: 'var(--btn-px)', fontSize: 'var(--btn-fs)' }}
             >
               + Add a battery
             </button>
             <button
               onClick={() => onViewChange('capture')}
-              style={{ padding: '8px 16px', fontSize: '13px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--foreground)', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}
+              className="confirm-action"
+              style={{ padding: 'var(--btn-px)', fontSize: 'var(--btn-fs)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--foreground)', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}
             >
               Retake photo
             </button>
@@ -90,14 +91,15 @@ export function ConfirmScreen({ circuit, solverResult, error, onUpdateComponentV
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button
               onClick={onAutoCompleteCircuit}
-              className="blue-button"
-              style={{ padding: '8px 16px', fontSize: '13px' }}
+              className="blue-button confirm-action"
+              style={{ padding: 'var(--btn-px)', fontSize: 'var(--btn-fs)' }}
             >
               Auto-complete this circuit
             </button>
             <button
               onClick={() => onViewChange('capture')}
-              style={{ padding: '8px 16px', fontSize: '13px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--foreground)', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}
+              className="confirm-action"
+              style={{ padding: 'var(--btn-px)', fontSize: 'var(--btn-fs)', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--foreground)', borderRadius: '4px', fontWeight: '600', cursor: 'pointer' }}
             >
               Retake photo
             </button>
@@ -158,7 +160,7 @@ export function ConfirmScreen({ circuit, solverResult, error, onUpdateComponentV
                         />
                         <span style={{ fontSize: '12px', color: 'var(--muted)' }}>V</span>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div className="polarity-desktop" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <label style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 'bold' }}>Direction:</label>
                         <button
                           type="button"
@@ -181,6 +183,23 @@ export function ConfirmScreen({ circuit, solverResult, error, onUpdateComponentV
                           onClick={() => onUpdateComponentValue(c.id, 'polarity', c.polarity === 'same' ? 'reversed' : 'same')}
                         >
                           {c.polarity === 'reversed' ? 'Reversed (–/+)' : c.polarity === 'same' ? 'Same (+/–)' : 'Unset'}
+                        </button>
+                      </div>
+                      <div className="polarity-mobile" style={{ alignItems: 'center', gap: '8px' }}>
+                        <label style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 'bold' }}>Direction:</label>
+                        <button
+                          type="button"
+                          className={`polarity-btn${c.polarity === 'same' ? ' polarity-btn-active' : ''}`}
+                          onClick={() => onUpdateComponentValue(c.id, 'polarity', 'same')}
+                        >
+                          Same (+/–)
+                        </button>
+                        <button
+                          type="button"
+                          className={`polarity-btn${c.polarity === 'reversed' ? ' polarity-btn-active' : ''}`}
+                          onClick={() => onUpdateComponentValue(c.id, 'polarity', 'reversed')}
+                        >
+                          Reversed (–/+)
                         </button>
                       </div>
                     </div>

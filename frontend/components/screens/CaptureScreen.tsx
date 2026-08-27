@@ -43,7 +43,7 @@ export function CaptureScreen({ error, loading, fileInputRef, onFileChange, onCa
 
       <button 
         className="blue-button"
-        style={{ height: '54px', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+        style={{ height: '54px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
         onClick={onCapture}
         disabled={loading}
       >
@@ -52,7 +52,7 @@ export function CaptureScreen({ error, loading, fileInputRef, onFileChange, onCa
       
       <button 
         className="literal-switch"
-        style={{ height: '54px', width: '100%', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: 'var(--surface)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
+        style={{ height: '54px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: 'var(--surface)', color: 'var(--foreground)', border: '1px solid var(--border)' }}
         onClick={() => fileInputRef.current?.click()}
         disabled={loading}
       >
