@@ -173,4 +173,83 @@ async function generateLearningSummary(studentProfile) {
   }
 }
 
-module.exports = { generateTutorResponse, generateLearningSummary };
+// ─── Evaluation Prompt ───────────────────────────────────────────────
+
+function buildEvaluationPrompt(studentProfile) {
+  const accuracy = studentProfile?.accuracy
+    ? `${Math.round(studentProfile.accuracy * 100)}%`
+    : "unknown";
+  const conceptAcc = studentProfile?.conceptAccuracy
+    ? Object.entries(studentProfile.conceptAccuracy)
+        .map(([k, v]) => `${k}: ${Math.round(v * 100)}% correct`)
+        .join(", ")
+    : "no data";
+  const topMisc = studentProfile?.topMisconceptions?.length
+    ? studentProfile.topMisconceptions
+        .map((m) => `"${m.label}" (${Math.round(m.confidence * 100)}% confidence — ${m.description})`)
+        .join("; ")
+    : "none detected";
+  const total = studentProfile?.totalPredictions || 0;
+  const streak = studentProfile?.recentStreak || "no recent pattern";
+
+  return `You are an expert physics education evaluator. You are analyzing a Grade 9-10 student's understanding of DC circuits. Use simple, encouraging English.
+
+## Student data
+- Total predictions made: ${total}
+- Overall accuracy: ${accuracy}
+- Per-concept accuracy: ${conceptAcc}
+- Detected misconceptions: ${topMisc}
+- Recent pattern: ${streak}
+
+Generate a comprehensive evaluation of this student's understanding. Be specific and constructive.
+
+Return ONLY valid JSON (no markdown):
+{
+  "overallAssessment": "A 3-4 sentence assessment of the student's overall understanding of DC circuits. Note their strengths and areas to improve.",
+  "conceptAnalysis": [
+    { "concept": "concept name", "level": "strong" | "developing" | "needs_work", "analysis": "2 sentence analysis of their understanding of this concept" }
+  ],
+  "misconceptions": [
+    { "label": "misconception name", "explanation": "Simple explanation of why this thinking is incorrect and what the correct understanding is." }
+  ],
+  "recommendations": [
+    "Specific, actionable recommendation 1",
+    "Specific, actionable recommendation 2",
+    "Specific, actionable recommendation 3"
+  ],
+  "encouragement": "A short, warm, encouraging message for the student."
+}`;
+}
+
+/**
+ * Generate a comprehensive AI evaluation of the student's learning.
+ * Falls back to null on failure.
+ *
+ * @param {object} studentProfile - Student learning profile
+ * @returns {Promise<object|null>}
+ */
+async function generateEvaluation(studentProfile) {
+  try {
+    const prompt = buildEvaluationPrompt(studentProfile);
+    const rawText = await callGemini(prompt, null, { timeoutMs: 15000 });
+    const parsed = parseJsonResponse(rawText);
+
+    if (!parsed.success || !parsed.data) return null;
+
+    const d = parsed.data;
+    if (!d.overallAssessment) return null;
+
+    return {
+      overallAssessment: d.overallAssessment,
+      conceptAnalysis: Array.isArray(d.conceptAnalysis) ? d.conceptAnalysis : [],
+      misconceptions: Array.isArray(d.misconceptions) ? d.misconceptions : [],
+      recommendations: Array.isArray(d.recommendations) ? d.recommendations : [],
+      encouragement: d.encouragement || "",
+    };
+  } catch (err) {
+    console.warn("AI evaluation failed:", err.message);
+    return null;
+  }
+}
+
+module.exports = { generateTutorResponse, generateLearningSummary, generateEvaluation };

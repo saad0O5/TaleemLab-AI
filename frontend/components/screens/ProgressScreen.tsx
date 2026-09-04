@@ -108,8 +108,8 @@ export function ProgressScreen({ studentModel, buildStudentProfile, onViewChange
           <button className="btn-text" onClick={() => onViewChange('simulate')}>
             &larr; Back to lab
           </button>
-          <button className="btn btn-outline btn-sm" onClick={() => onViewChange('teacher')} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            <Icon type="users" size={14} /> Teacher view
+          <button className="btn btn-outline btn-sm" onClick={() => onViewChange('evaluation')} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <Icon type="brain" size={14} /> AI Evaluation
           </button>
         </div>
 

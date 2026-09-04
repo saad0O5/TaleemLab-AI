@@ -54,6 +54,21 @@ function layoutUnits(circuit: CircuitData): LayoutUnit[] {
   return units
 }
 
+/**
+ * Sort units so battery is on the left edge, then remaining components
+ * flow clockwise: top → right → bottom.
+ */
+function sortUnitsForLayout(units: LayoutUnit[]): LayoutUnit[] {
+  const batteries: LayoutUnit[] = []
+  const others: LayoutUnit[] = []
+  for (const u of units) {
+    const type = u.kind === 'single' ? u.component.type : u.components[0]?.type
+    if (type === 'battery') batteries.push(u)
+    else others.push(u)
+  }
+  return [...batteries, ...others]
+}
+
 function valueLabel(component: CircuitComponent): string {
   if (component.type === 'battery' && component.voltage !== undefined) return `${component.voltage} V`
   if ((component.type === 'resistor' || component.type === 'bulb') && component.resistance !== undefined) return `${component.resistance} Ω`
@@ -116,6 +131,8 @@ function DiagramNode({ component, x, y, size, edge, state, sideLabels }: {
   }
 
   return <g className={`node node-${component.type}`} transform={`translate(${x} ${y})`}>
+    {/* Background circle to mask the wire behind the component */}
+    <circle cx="0" cy="0" r={size / 2 + 4} style={{ fill: 'var(--surface)', stroke: 'none' }} />
     <g transform={`translate(${-size / 2} ${-size / 2}) scale(${size / 24})`} strokeWidth={3 * 24 / size}>
       <Glyph component={component} bulbStyle={bulbStyle} />
     </g>
@@ -158,16 +175,105 @@ function GroupNode({ components, x, y, size, edge, states }: {
   </g>
 }
 
+/**
+ * Build wire segments that trace the rectangle perimeter but skip
+ * a gap around each component position.
+ */
+function buildWireSegments(positions: { x: number; y: number; edge: Edge }[], gapSize: number): string[] {
+  const n = positions.length
+  if (n === 0) return [`M${RECT.x1} ${RECT.y1}H${RECT.x2}V${RECT.y2}H${RECT.x1}V${RECT.y1}`]
+
+  // Convert each position to a perimeter distance
+  function distOf(p: { x: number; y: number; edge: Edge }): number {
+    switch (p.edge) {
+      case 'top': return p.x - RECT.x1
+      case 'right': return LOOP_W + (p.y - RECT.y1)
+      case 'bottom': return LOOP_W + LOOP_H + (RECT.x2 - p.x)
+      case 'left': return 2 * LOOP_W + LOOP_H + (RECT.y2 - p.y)
+    }
+  }
+
+  const halfGap = gapSize / 2
+  const segments: string[] = []
+
+  for (let i = 0; i < n; i++) {
+    const from = positions[i]
+    const to = positions[(i + 1) % n]
+    const fromDist = distOf(from) + halfGap
+    const toDist = distOf(to) - halfGap
+
+    // Handle wrap-around
+    let endDist = toDist
+    if (endDist <= fromDist) endDist += PERIMETER
+
+    // Build a path from fromDist to endDist along the rectangle
+    const points: string[] = []
+    let d = fromDist
+    const corners = [0, LOOP_W, LOOP_W + LOOP_H, 2 * LOOP_W + LOOP_H, PERIMETER]
+
+    // Starting point
+    const startPt = pointAt(d)
+    points.push(`M${startPt.x} ${startPt.y}`)
+
+    // Walk along the perimeter, adding corner points as needed
+    while (d < endDist) {
+      const nextCorner = corners.find(c => c > (d % PERIMETER)) ?? PERIMETER
+      const nextCornerDist = d + ((nextCorner - (d % PERIMETER)) % PERIMETER || PERIMETER)
+
+      if (nextCornerDist <= endDist) {
+        const cp = pointAt(nextCornerDist)
+        points.push(`L${cp.x} ${cp.y}`)
+        d = nextCornerDist
+      } else {
+        break
+      }
+    }
+
+    // End point
+    const endPt = pointAt(endDist % PERIMETER)
+    points.push(`L${endPt.x} ${endPt.y}`)
+    segments.push(points.join(''))
+  }
+
+  return segments
+}
+
 export function CircuitDiagram({ circuit, componentStates, closed, current }: CircuitDiagramProps) {
-  const units = circuit ? layoutUnits(circuit) : []
+  const rawUnits = circuit ? layoutUnits(circuit) : []
+  const units = sortUnitsForLayout(rawUnits)
   const n = units.length
   const size = n > 6 ? Math.max(22, Math.round(44 * 6 / n)) : 44
+  const gapForWire = size + 16 // gap around each component
+
+  // Compute positions for all units
+  const positions = units.map((_, i) => pointAt(PERIMETER * (i + 0.5) / n))
+
+  // Build wire segments (skipping component gaps)
+  const wireSegments = n > 0 ? buildWireSegments(positions, gapForWire) : [`M${RECT.x1} ${RECT.y1}H${RECT.x2}V${RECT.y2}H${RECT.x1}V${RECT.y1}`]
 
   return <div className={`sim-diagram ${closed ? 'is-flowing' : ''}`} style={{ '--pulse-speed': `${Math.max(0.2, 2.5 - Math.sqrt(current) * 1.05)}s` } as React.CSSProperties}>
     <svg viewBox="0 0 560 300" role="img" aria-label="Interactive rectangular circuit diagram">
-      <path className="circuit-wire" d={`M${RECT.x1} ${RECT.y1}H${RECT.x2}V${RECT.y2}H${RECT.x1}V${RECT.y1}`} />
+      {/* Wire segments between components */}
+      {wireSegments.map((d, i) => (
+        <path key={i} className="circuit-wire" d={d} />
+      ))}
+      {/* Connection dots at wire-component junctions */}
+      {positions.map((p, i) => {
+        const halfGap = gapForWire / 2
+        const before = pointAt(
+          ((['top', 'right', 'bottom', 'left'].indexOf(p.edge) === 0 ? p.x - RECT.x1 : p.edge === 'right' ? LOOP_W + p.y - RECT.y1 : p.edge === 'bottom' ? LOOP_W + LOOP_H + RECT.x2 - p.x : 2 * LOOP_W + LOOP_H + RECT.y2 - p.y) - halfGap + PERIMETER) % PERIMETER
+        )
+        const after = pointAt(
+          ((['top', 'right', 'bottom', 'left'].indexOf(p.edge) === 0 ? p.x - RECT.x1 : p.edge === 'right' ? LOOP_W + p.y - RECT.y1 : p.edge === 'bottom' ? LOOP_W + LOOP_H + RECT.x2 - p.x : 2 * LOOP_W + LOOP_H + RECT.y2 - p.y) + halfGap) % PERIMETER
+        )
+        return <g key={`dots-${i}`}>
+          <circle cx={before.x} cy={before.y} r="3" className="wire-dot" />
+          <circle cx={after.x} cy={after.y} r="3" className="wire-dot" />
+        </g>
+      })}
+      {/* Components */}
       {units.map((unit, i) => {
-        const { x, y, edge } = pointAt(PERIMETER * (i + 0.5) / n)
+        const { x, y, edge } = positions[i]
         if (unit.kind === 'single') {
           return <DiagramNode
             key={unit.component.id}

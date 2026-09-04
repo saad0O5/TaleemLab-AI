@@ -98,3 +98,24 @@ export async function getLearningSummary(profile: StudentProfileForAI): Promise<
     return null;
   }
 }
+
+export interface AIEvaluation {
+  overallAssessment: string;
+  conceptAnalysis: { concept: string; level: 'strong' | 'developing' | 'needs_work'; analysis: string }[];
+  misconceptions: { label: string; explanation: string }[];
+  recommendations: string[];
+  encouragement: string;
+  isAI: boolean;
+}
+
+/**
+ * Get a comprehensive AI evaluation of the student's learning.
+ * Returns null if the AI call fails.
+ */
+export async function getEvaluation(profile: StudentProfileForAI): Promise<AIEvaluation | null> {
+  try {
+    return await postJSON<AIEvaluation>("/api/evaluate-student", { studentProfile: profile });
+  } catch {
+    return null;
+  }
+}

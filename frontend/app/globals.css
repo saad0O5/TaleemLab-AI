@@ -205,9 +205,35 @@ button:active { transform: scale(0.98); }
   margin-bottom: 16px;
 }
 .step-line.done { background: var(--success); }
+@media (max-width: 600px) {
+  .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+  .topbar .brand {
+    order: 1;
+    flex: 1;
+  }
+  .topbar .top-actions {
+    order: 2;
+  }
+  .topbar .steps {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+  .brand span:not(.brand-mark):not(.brand-accent) {
+    /* brand text is fine, keep as is */
+  }
+}
 @media (max-width: 480px) {
   .step-label { display: none; }
-  .step-line { width: 16px; }
+  .step-line { width: 12px; margin: 0 2px; }
+  .step-circle { width: 26px; height: 26px; font-size: 11px; }
 }
 
 /* ─── Page Layout ─── */
@@ -510,17 +536,27 @@ button:active { transform: scale(0.98); }
 }
 .sim-diagram svg { width: 100%; display: block; }
 .circuit-wire {
-  stroke: var(--muted-light);
+  stroke: var(--foreground);
   stroke-width: 2;
-  stroke-dasharray: 5 10;
   fill: none;
-  opacity: 0.25;
+  opacity: 0.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wire-dot {
+  fill: var(--foreground);
+  opacity: 0.45;
 }
 .is-flowing .circuit-wire {
   animation: dash-flow var(--pulse-speed) linear infinite;
   stroke: var(--teal);
-  stroke-width: 3.5;
+  stroke-width: 3;
   stroke-dasharray: 10 7;
+  opacity: 1;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--teal) 70%, transparent));
+}
+.is-flowing .wire-dot {
+  fill: var(--teal);
   opacity: 1;
   filter: drop-shadow(0 0 3px color-mix(in srgb, var(--teal) 70%, transparent));
 }
@@ -1643,21 +1679,25 @@ button:active { transform: scale(0.98); }
 .undo-btn:hover { color: var(--foreground); }
 .undo-btn:disabled { opacity: 0.3; cursor: default; }
 
-/* ─── Teacher Dashboard ─── */
-.teacher-layout {
-  max-width: 1100px;
+/* ─── AI Evaluation Screen ─── */
+.evaluation-layout {
+  max-width: 640px;
   margin: 0 auto;
   padding: 24px 16px;
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 @media (min-width: 768px) {
-  .teacher-layout { padding: 32px 24px; }
+  .evaluation-layout { padding: 32px 24px; gap: 20px; }
 }
-.teacher-header {
+.evaluation-header {
   text-align: center;
 }
-.teacher-header .eyebrow {
+.evaluation-header .eyebrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 1.5px;
@@ -1665,185 +1705,181 @@ button:active { transform: scale(0.98); }
   color: var(--teal);
   margin: 0 0 8px;
 }
-.teacher-header h1 {
+.evaluation-header h1 {
   margin: 0 0 8px;
   font: 800 clamp(24px, 5vw, 36px) / 1.1 var(--font-heading);
   color: var(--foreground);
   letter-spacing: -0.5px;
 }
-.teacher-header h1 span { color: var(--teal); }
-.teacher-header p {
+.evaluation-header h1 span { color: var(--teal); }
+.evaluation-header p {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
-  max-width: 520px;
+  max-width: 480px;
   margin-inline: auto;
-}
-.teacher-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-.teacher-stat-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  text-align: center;
-  box-shadow: var(--shadow);
-}
-.teacher-stat-value {
-  font: 800 24px var(--font-heading);
-  color: var(--teal);
-  font-variant-numeric: tabular-nums;
-}
-.teacher-stat-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-top: 2px;
-}
-.student-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-@media (min-width: 640px) {
-  .student-grid { grid-template-columns: 1fr 1fr; }
-}
-@media (min-width: 960px) {
-  .student-grid { grid-template-columns: repeat(3, 1fr); }
-}
-.student-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--shadow);
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-.student-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-.student-card-name {
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--foreground);
-  margin-bottom: 4px;
-}
-.student-card-meta {
-  font-size: 11px;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-.student-card-stats {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-.student-card-stat {
-  font-size: 11px;
-  font-weight: 700;
-}
-.student-card-stat strong {
-  color: var(--foreground);
-  font-size: 16px;
-  display: block;
-}
-.student-card-stat span {
-  color: var(--muted);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-.student-card-summary {
-  font-size: 12px;
-  color: var(--muted);
   line-height: 1.5;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-  margin-top: 6px;
 }
-.student-card-badge {
-  display: inline-block;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-right: 4px;
-}
-.badge-strong { background: var(--success-light); color: var(--success); }
-.badge-developing { background: var(--warning-light); color: var(--warning); }
-.badge-beginner { background: var(--surface-soft); color: var(--muted); }
 
-/* ─── Teacher Detail View ─── */
-.teacher-detail {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 24px 16px;
-  display: grid;
-  gap: 16px;
-}
-.teacher-detail-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.teacher-detail-avatar {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  background: var(--teal-light);
-  color: var(--teal);
-  border-radius: 50%;
-  font-size: 20px;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-.teacher-detail-name {
-  font: 800 20px var(--font-heading);
-  margin: 0;
-}
-.teacher-detail-meta {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 2px 0 0;
-}
-.teacher-ai-summary {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--teal);
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--shadow);
-}
-.teacher-ai-label {
-  display: flex;
+.eval-ai-badge {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 1.2px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--teal);
-  margin-bottom: 10px;
+  background: var(--teal-light);
+  padding: 4px 10px;
+  border-radius: 999px;
+  justify-self: center;
 }
-.teacher-ai-text {
+
+.eval-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.eval-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+/* Overall assessment */
+.eval-assessment-text {
   font-size: 14px;
+  line-height: 1.6;
   color: var(--foreground);
+  margin: 0;
+}
+
+/* Concept cards */
+.eval-concepts {
+  display: grid;
+  gap: 10px;
+}
+.eval-concept-card {
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+.eval-concept-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.eval-concept-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.eval-concept-level {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.eval-concept-analysis {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Misconceptions */
+.eval-misconceptions {
+  display: grid;
+  gap: 10px;
+}
+.eval-misconception-card {
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  border-left: 3px solid var(--warning);
+}
+.eval-misconception-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+  margin-bottom: 4px;
+}
+.eval-misconception-explanation {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Recommendations */
+.eval-recommendations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.eval-recommendation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--foreground);
+  line-height: 1.5;
+}
+.eval-rec-number {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  background: var(--primary-light);
+  color: var(--primary);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* Encouragement */
+.eval-encouragement {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--teal-light);
+  border: 1px solid var(--teal);
+  border-radius: var(--radius);
+  padding: 16px;
+  color: var(--foreground);
+}
+.eval-encouragement svg {
+  flex-shrink: 0;
+  color: var(--teal);
+  margin-top: 2px;
+}
+.eval-encouragement p {
+  font-size: 14px;
   line-height: 1.55;
   margin: 0;
 }
-.teacher-misconceptions {
+
+/* Action buttons */
+.eval-actions {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  padding-top: 4px;
 }
 
 /* ─── Keyboard Shortcut Hints ─── */

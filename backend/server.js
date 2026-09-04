@@ -3,7 +3,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { callGemini } = require("./lib/gemini");
-const { generateTutorResponse, generateLearningSummary } = require("./lib/aiTutor");
+const { generateTutorResponse, generateLearningSummary, generateEvaluation } = require("./lib/aiTutor");
 const { RECOGNITION_PROMPT, parseCircuitRecognitionResponse } = require("./lib/prompts");
 const { solveCircuit, SANITY_LIMITS } = require("./lib/circuitSolver");
 const { parseCommand } = require("./lib/textCommandParser");
@@ -518,6 +518,55 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       return sendJSON(res, 500, {
         error: "summary_error",
+        message: err.message
+      });
+    }
+  }
+
+  // POST /api/evaluate-student
+  if (pathname === "/api/evaluate-student" && req.method === "POST") {
+    try {
+      const body = await parseRequestBody(req);
+      const studentProfile = body?.studentProfile || body || {};
+
+      const evaluation = await generateEvaluation(studentProfile);
+
+      if (evaluation) {
+        return sendJSON(res, 200, { ...evaluation, isAI: true });
+      }
+
+      // Fallback: rule-based evaluation
+      const total = studentProfile.totalPredictions || 0;
+      const accuracy = studentProfile.accuracy ? Math.round(studentProfile.accuracy * 100) : 0;
+      const conceptAcc = studentProfile.conceptAccuracy || {};
+      const misconceptions = (studentProfile.topMisconceptions || []).map(m => ({
+        label: m.label,
+        explanation: `${m.label}: ${m.description}. This is a common misunderstanding — keep experimenting to build intuition.`
+      }));
+      const recommendations = [];
+      if (accuracy < 50) recommendations.push("Focus on the basics — try changing one variable at a time and observe what happens to the current.");
+      else if (accuracy < 80) recommendations.push("You're getting there! Try predicting before each change to strengthen your understanding.");
+      else recommendations.push("Great accuracy! Challenge yourself with more complex circuits and parallel arrangements.");
+      if (misconceptions.length > 0) recommendations.push(`Work on your understanding of: ${misconceptions.map(m => m.label).join(", ")}.`);
+      if (total < 5) recommendations.push("Make more predictions to get a detailed AI evaluation.");
+
+      return sendJSON(res, 200, {
+        overallAssessment: total > 0
+          ? `You've made ${total} predictions with ${accuracy}% accuracy. ${accuracy >= 80 ? 'Strong understanding!' : accuracy >= 50 ? 'Developing understanding — keep going!' : 'Early stages — every experiment builds your knowledge.'}`
+          : "Make some predictions in the lab to get your personalized AI evaluation.",
+        conceptAnalysis: Object.entries(conceptAcc).map(([concept, acc]) => ({
+          concept,
+          level: acc >= 0.8 ? "strong" : acc >= 0.5 ? "developing" : "needs_work",
+          analysis: `${concept}: ${Math.round(acc * 100)}% accuracy. ${acc >= 0.8 ? 'Good grasp!' : 'Needs more practice.'}`
+        })),
+        misconceptions,
+        recommendations,
+        encouragement: total > 0 ? "Keep experimenting — every prediction builds your understanding!" : "Start making predictions to unlock your full evaluation.",
+        isAI: false
+      });
+    } catch (err) {
+      return sendJSON(res, 500, {
+        error: "evaluation_error",
         message: err.message
       });
     }
