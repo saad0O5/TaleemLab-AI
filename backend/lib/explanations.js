@@ -52,19 +52,25 @@ function explainChange(field, oldValue, newValue, context = null) {
   if (field === "state") {
     if (newValue === "open") {
       if (oldCurrent !== undefined) {
-        return `The switch is now open — current stopped flowing (was ${oldCurrent.toFixed(3)}A).`;
+        return `The switch is now open \u2014 current stopped flowing (was ${oldCurrent.toFixed(3)}A). An open switch breaks the circuit path, so electrons can no longer move through the wire.`;
       }
-      return "The circuit is now open — current stops flowing.";
+      return "The circuit is now open \u2014 current stops flowing because the switch breaks the path for electrons.";
     }
     if (newValue === "closed") {
       if (newCurrent !== undefined) {
-        return `The switch is now closed — current flows again (${newCurrent.toFixed(3)}A).`;
+        return `The switch is now closed \u2014 current flows again (${newCurrent.toFixed(3)}A). Closing the switch completes the circuit path so electrons can move.`;
       }
-      return "The circuit is now closed — current flows again.";
+      return "The circuit is now closed \u2014 current flows again because the path is complete.";
     }
   }
 
-  return "The circuit updated based on your change.";
+  // Rich generic fallback based on context
+  if (oldCurrent !== undefined && newCurrent !== undefined) {
+    const change = newCurrent - oldCurrent;
+    const direction = change > 0 ? 'increased' : 'decreased';
+    return `Current ${direction} from ${oldCurrent.toFixed(3)}A to ${newCurrent.toFixed(3)}A. Think about what caused this change and why.`;
+  }
+  return "The circuit updated. Try predicting what will happen before making your next change \u2014 it helps build your understanding of how circuits work.";
 }
 
 module.exports = {

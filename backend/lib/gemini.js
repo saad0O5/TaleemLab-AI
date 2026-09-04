@@ -1,7 +1,6 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
 /**
- * Generic Gemini wrapper — handles both text-only and vision (text + image) requests.
+ * Generic Gemini wrapper — uses the REST API directly (no SDK dependency).
+ * Handles both text-only and vision (text + image) requests.
  *
  * @param {string} textPrompt - The text prompt to send
  * @param {string|null} [imageBase64] - Optional base64 image or data URL for vision mode
@@ -17,10 +16,7 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
     );
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
   const modelName = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-  const model = genAI.getGenerativeModel({ model: modelName });
-
   const timeoutMs = options.timeoutMs || 30000;
 
   // Build content parts
@@ -33,7 +29,7 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
 
     if (typeof imageBase64 === "string" && imageBase64.startsWith("data:")) {
       const matches = imageBase64.match(
-        /^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.*)$/s
+        /^data:([a-zA-Z0-9]+\/[a-zA-Z0-9\-.+]+);base64,(.*)$/s
       );
       if (matches) {
         mimeType = matches[1];
@@ -52,7 +48,7 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
 
     cleanBase64 = cleanBase64.trim();
 
-    parts.push(textPrompt);
+    parts.push({ text: textPrompt });
     parts.push({
       inlineData: {
         data: cleanBase64,
@@ -61,27 +57,94 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
     });
   } else {
     // Text-only mode
-    parts.push(textPrompt);
+    parts.push({ text: textPrompt });
   }
 
-  // Execute with timeout
-  const resultPromise = model.generateContent(parts);
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("Gemini request timed out")), timeoutMs)
-  );
+  const body = JSON.stringify({
+    contents: [{ parts }],
+  });
 
-  const result = await Promise.race([resultPromise, timeoutPromise]);
-  const response = await result.response;
-  const text = response.text();
+  const FALLBACK_MODELS = [];
+  const MAX_RETRIES = 2;
+  const modelsToTry = [modelName, ...FALLBACK_MODELS.filter(m => m !== modelName)];
 
-  // Retry once if response is empty
-  if (!text || text.trim().length === 0) {
-    const retryResult = await model.generateContent(parts);
-    const retryResponse = await retryResult.response;
-    return retryResponse.text();
+  for (const model of modelsToTry) {
+    const tryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      // Backoff: 1s, 2s, 4s
+      if (attempt > 0) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      let response;
+      try {
+        response = await fetch(tryUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          signal: controller.signal,
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        if (err.name === "AbortError") {
+          throw new Error("Gemini request timed out");
+        }
+        throw new Error(`Gemini network error: ${err.message}`);
+      }
+      clearTimeout(timer);
+
+      // Retryable errors: 503 (unavailable), 429 (rate limit), 500 (server error)
+      if (response.status === 503 || response.status === 429 || response.status === 500) {
+        if (attempt < MAX_RETRIES) {
+          console.warn(`Gemini ${model} returned ${response.status}, retrying (${attempt + 1}/${MAX_RETRIES})...`);
+          continue;
+        }
+        // Exhausted retries on this model — try fallback model
+        break;
+      }
+
+      if (!response.ok) {
+        // Non-retryable error (404, 401, etc.) — try next model
+        if (response.status === 404) {
+          console.warn(`Gemini model ${model} not found, trying fallback...`);
+          break;
+        }
+        const errText = await response.text().catch(() => "");
+        throw new Error(`Gemini API error ${response.status}: ${errText.substring(0, 200)}`);
+      }
+
+      const data = await response.json();
+
+      // Extract text from response
+      const text = data?.candidates?.[0]?.content?.parts
+        ?.map((p) => p.text || "")
+        .join("") || "";
+
+      // Retry once if response is empty
+      if (!text || text.trim().length === 0) {
+        const retryResponse = await fetch(tryUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+        if (retryResponse.ok) {
+          const retryData = await retryResponse.json();
+          const retryText = retryData?.candidates?.[0]?.content?.parts
+            ?.map((p) => p.text || "")
+            .join("") || "";
+          if (retryText) return retryText;
+        }
+      }
+
+      if (text) return text;
+    }
   }
 
-  return text;
+  throw new Error("All Gemini models unavailable — please try again later.");
 }
 
 /**

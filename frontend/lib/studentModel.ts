@@ -11,7 +11,7 @@
  */
 
 import { PredictionKey, CircuitData } from './types'
-import { supabase, getStudentId } from './supabase'
+import { supabase, getStudentId, disableSupabase } from './supabase'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -182,8 +182,10 @@ export function resetStudentModel(): StudentModel {
 // ─── Supabase Sync ───────────────────────────────────────────────────
 
 async function syncToSupabase(model: StudentModel): Promise<void> {
+  if (!supabase) return
   try {
     const studentId = await getStudentId()
+    if (!studentId) return
     
     // Update student record
     await supabase.from('students').upsert({
@@ -231,13 +233,16 @@ async function syncToSupabase(model: StudentModel): Promise<void> {
       localStorage.setItem('taleemlab_last_synced_evidence', model.evidence.length.toString())
     }
   } catch (err) {
-    console.warn('Supabase sync failed:', err)
+    console.warn('Supabase sync failed, disabling:', (err as Error).message)
+    disableSupabase()
   }
 }
 
 export async function loadFromSupabase(): Promise<StudentModel | null> {
+  if (!supabase) return null
   try {
     const studentId = await getStudentId()
+    if (!studentId) return null
     
     // Load misconceptions
     const { data: misData } = await supabase
@@ -304,7 +309,8 @@ export async function loadFromSupabase(): Promise<StudentModel | null> {
     
     return model
   } catch (err) {
-    console.warn('Supabase load failed:', err)
+    console.warn('Supabase load failed, disabling:', (err as Error).message)
+    disableSupabase()
     return null
   }
 }
@@ -633,6 +639,14 @@ export function recordPrediction(entry: PredictionEntry): void {
   const entries = getPredictions()
   entries.push(entry)
   localStorage.setItem(PREDICTIONS_KEY, JSON.stringify(entries))
+}
+
+export function removeLastPrediction(): PredictionEntry | null {
+  const entries = getPredictions()
+  if (entries.length === 0) return null
+  const removed = entries.pop()!
+  localStorage.setItem(PREDICTIONS_KEY, JSON.stringify(entries))
+  return removed
 }
 
 export function getPredictions(): PredictionEntry[] {

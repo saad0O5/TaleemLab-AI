@@ -130,7 +130,7 @@ Return ONLY valid JSON (no markdown):
 async function generateTutorResponse(input) {
   try {
     const prompt = buildTutorPrompt(input);
-    const rawText = await callGemini(prompt, null, { timeoutMs: 8000 });
+    const rawText = await callGemini(prompt, null, { timeoutMs: 15000 });
     const parsed = parseJsonResponse(rawText);
 
     if (!parsed.success || !parsed.data) return null;
@@ -161,7 +161,7 @@ async function generateTutorResponse(input) {
 async function generateLearningSummary(studentProfile) {
   try {
     const prompt = buildSummaryPrompt(studentProfile);
-    const rawText = await callGemini(prompt, null, { timeoutMs: 8000 });
+    const rawText = await callGemini(prompt, null, { timeoutMs: 15000 });
     const parsed = parseJsonResponse(rawText);
 
     if (!parsed.success || !parsed.data || !parsed.data.summary) return null;

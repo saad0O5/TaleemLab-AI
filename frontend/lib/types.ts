@@ -51,7 +51,7 @@ export interface SolverResult {
   explanation?: string;
 }
 
-export type View = "capture" | "confirm" | "simulate" | "progress";
+export type View = "capture" | "confirm" | "simulate" | "progress" | "teacher";
 
 export type PredictionKey = "resistance" | "voltage" | "state";
 

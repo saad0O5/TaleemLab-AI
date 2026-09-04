@@ -5,6 +5,7 @@ import { WelcomeScreen } from '../components/screens/WelcomeScreen'
 import { SetupScreen } from '../components/screens/SetupScreen'
 import { LabScreen } from '../components/screens/LabScreen'
 import { ProgressScreen } from '../components/screens/ProgressScreen'
+import { TeacherScreen } from '../components/screens/TeacherScreen'
 import { CameraModal } from '../components/camera/CameraModal'
 
 const STEP_TO_VIEW = { 1: 'capture', 2: 'confirm', 3: 'simulate', 4: 'progress' } as const
@@ -22,6 +23,11 @@ export default function Page() {
     if (targetIdx <= currentIdx || exp.circuit) {
       exp.setView(targetView as any)
     }
+  }
+
+  // TEACHER VIEW
+  if (exp.view === 'teacher') {
+    return <TeacherScreen onViewChange={exp.setView} />
   }
 
   // CAPTURE VIEW
@@ -102,6 +108,8 @@ export default function Page() {
     onDismissComparison={exp.dismissComparison}
     studentModel={exp.studentModel}
     onResetStudentModel={exp.handleResetStudentModel}
+    onUndo={exp.undoPrediction}
+    canUndo={exp.canUndo}
     onStepClick={handleStepClick}
   />
 }

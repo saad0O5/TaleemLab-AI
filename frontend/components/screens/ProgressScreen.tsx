@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getLearningSummary, StudentProfileForAI } from '../../lib/api'
+import { loadFromSupabase } from '../../lib/studentModel'
 import {
   StudentModel, getSRMSummary, getConceptLabel, MISCONCEPTIONS, ConceptId,
   getPredictions, getConceptBreakdown, PredictionEntry
@@ -28,6 +29,17 @@ export function ProgressScreen({ studentModel, buildStudentProfile, onViewChange
   const [summary, setSummary] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [summaryIsAI, setSummaryIsAI] = useState(false)
+  const [supabaseLoaded, setSupabaseLoaded] = useState(false)
+
+  // Try loading from Supabase on mount (for cross-device support)
+  useEffect(() => {
+    loadFromSupabase().then(data => {
+      if (data) setSupabaseLoaded(true)
+    }).catch(() => {})
+    // Small delay to let localStorage data populate first
+    const t = setTimeout(() => setSupabaseLoaded(true), 1500)
+    return () => clearTimeout(t)
+  }, [])
 
   useEffect(() => {
     const profile = buildStudentProfile()
@@ -92,10 +104,30 @@ export function ProgressScreen({ studentModel, buildStudentProfile, onViewChange
 
       <div className="page-body progress-body">
         {/* Back link */}
-        <button className="btn-text" onClick={() => onViewChange('simulate')}>
-          &larr; Back to lab
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button className="btn-text" onClick={() => onViewChange('simulate')}>
+            &larr; Back to lab
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={() => onViewChange('teacher')} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <Icon type="users" size={14} /> Teacher view
+          </button>
+        </div>
 
+        {/* Empty state */}
+        {totalPredictions === 0 && recentEvidence.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <Icon type="target" size={40} />
+            </div>
+            <h2>No data yet</h2>
+            <p>Go to the lab and make some predictions to see your learning progress here. Every prediction helps the AI understand your thinking.</p>
+            <button className="btn btn-primary" onClick={() => onViewChange('simulate')}>
+              <Icon type="flask" size={16} />
+              Go to the lab
+            </button>
+          </div>
+        ) : (
+        <>
         {/* Stats Cards */}
         <div className="progress-stats">
           <div className="progress-stat-card">
@@ -236,6 +268,8 @@ export function ProgressScreen({ studentModel, buildStudentProfile, onViewChange
             Start new experiment
           </button>
         </div>
+        </>
+        )}
       </div>
     </main>
   )

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   CircuitData, ComponentState, View, PredictionKey, Prediction,
   Explanation, SolverFlag, SANITY_LIMITS
@@ -62,6 +62,8 @@ interface LabScreenProps {
   onDismissComparison: () => void
   studentModel: StudentModel
   onResetStudentModel: () => void
+  onUndo?: () => void
+  canUndo?: boolean
   onStepClick?: (step: number) => void
 }
 
@@ -74,11 +76,26 @@ export function LabScreen(props: LabScreenProps) {
     onSelectExample, onViewChange, onChangeValue, onRequestChange,
     onToggleSwitch, onCommandInputChange, onApplyCommand,
     correctionComparison, onDismissComparison,
-    studentModel, onResetStudentModel, onStepClick,
+    studentModel, onResetStudentModel, onUndo, canUndo, onStepClick,
   } = props
 
   const [showHint, setShowHint] = useState(false)
   const [showCommand, setShowCommand] = useState(false)
+
+  // Keyboard shortcuts: 1=increases, 2=decreases, 3=same (for predictions)
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+    if (prediction) {
+      if (e.key === '1') onChangeValue(prediction.key, predictedNext, prediction.direction, 'up')
+      else if (e.key === '2') onChangeValue(prediction.key, predictedNext, prediction.direction, 'down')
+      else if (e.key === '3') onChangeValue(prediction.key, predictedNext, prediction.direction, 'same')
+    }
+  }, [prediction, predictedNext, onChangeValue])
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   const entries = getPredictions()
   const breakdown = getConceptBreakdown(entries)
@@ -168,15 +185,15 @@ export function LabScreen(props: LabScreenProps) {
               <div className="answer-grid">
                 <button className="answer-btn" onClick={() => onChangeValue(prediction.key, predictedNext, prediction.direction, 'up')}>
                   <span className="answer-icon"><Icon type="arrow-up" size={14} /></span>
-                  Increases
+                  Increases <span className="kbd">1</span>
                 </button>
                 <button className="answer-btn" onClick={() => onChangeValue(prediction.key, predictedNext, prediction.direction, 'down')}>
                   <span className="answer-icon"><Icon type="arrow-down" size={14} /></span>
-                  Decreases
+                  Decreases <span className="kbd">2</span>
                 </button>
                 <button className="answer-btn" onClick={() => onChangeValue(prediction.key, predictedNext, prediction.direction, 'same')}>
                   <span className="answer-icon"><Icon type="equals" size={14} /></span>
-                  Stays the same
+                  Stays the same <span className="kbd">3</span>
                 </button>
               </div>
               {!showHint && <button className="hint-toggle" onClick={() => setShowHint(true)}>Need a hint?</button>}
@@ -251,6 +268,7 @@ export function LabScreen(props: LabScreenProps) {
                     id="command"
                     value={command}
                     onChange={(e) => onCommandInputChange(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && command.trim()) onApplyCommand() }}
                     placeholder="e.g. increase voltage to 12"
                   />
                   <button className="btn btn-primary btn-sm" onClick={onApplyCommand}>Apply</button>
@@ -267,6 +285,11 @@ export function LabScreen(props: LabScreenProps) {
                 <span className="progress-title">Mastery</span>
                 <span className="progress-count">{totalCorrect}/{entries.length} correct</span>
               </div>
+              {onUndo && canUndo && (
+                <button className="undo-btn" onClick={onUndo}>
+                  <Icon type="undo" size={12} /> Undo last prediction
+                </button>
+              )}
               {Object.entries(breakdown).map(([concept, { correct, total }]) => {
                 const m = masteryLevel(correct, total)
                 return (

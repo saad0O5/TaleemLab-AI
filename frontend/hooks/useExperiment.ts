@@ -9,7 +9,7 @@ import {
 } from '../lib/api'
 import { ExampleKey, mockCircuitExamples } from '../lib/exampleCircuits'
 import {
-  recordPrediction, resetProgress,
+  recordPrediction, removeLastPrediction, resetProgress,
   loadStudentModel, updateStudentModel, resetStudentModel,
   detectCircuitContext, saveStudentModel, loadFromSupabase,
   StudentModel, MISCONCEPTIONS
@@ -98,6 +98,18 @@ export function useExperiment() {
   const [aiThinking, setAiThinking] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Undo: save state before each prediction
+  interface UndoSnapshot {
+    circuit: CircuitData
+    solverResult: SolverResult | null
+    voltage: number
+    resistance: number
+    closed: boolean
+    studentModel: StudentModel
+    explanation: Explanation | null
+  }
+  const undoRef = useRef<UndoSnapshot | null>(null)
 
   // Load from Supabase on mount
   useEffect(() => {
@@ -327,6 +339,16 @@ export function useExperiment() {
 
   const change = async (key: PredictionKey, next: any, direction: 'up' | 'down', answer: 'up' | 'down' | 'same') => {
     if (!circuit) return
+
+    // Save snapshot for undo
+    undoRef.current = {
+      circuit: { ...circuit, components: circuit.components.map(c => ({ ...c })) },
+      solverResult: solverResult ? { ...solverResult } : null,
+      voltage, resistance, closed,
+      studentModel,
+      explanation,
+    }
+
     const correctAnswer = key === 'resistance'
       ? (direction === 'up' ? 'down' : 'up')
       : (direction === 'up' ? 'up' : 'down')
@@ -553,6 +575,21 @@ export function useExperiment() {
     setCorrectionComparison: (v: CorrectionComparison | null) => setCorrectionComparison(v),
     dismissComparison: () => setCorrectionComparison(null),
     handleResetStudentModel,
+    undoPrediction: () => {
+      const snap = undoRef.current
+      if (!snap) return
+      setCircuit(snap.circuit)
+      setSolverResult(snap.solverResult)
+      setVoltage(snap.voltage)
+      setResistance(snap.resistance)
+      setClosed(snap.closed)
+      setStudentModel(snap.studentModel)
+      saveStudentModel(snap.studentModel)
+      setExplanation(snap.explanation)
+      removeLastPrediction()
+      undoRef.current = null
+    },
+    canUndo: undoRef.current !== null,
     buildStudentProfile: () => buildStudentProfile(studentModel),
   }
 }

@@ -11,6 +11,12 @@ export function Icon({ type, size = 20 }: { type: string; size?: number }) {
   if (type === 'arrow-down') return <svg {...p}><path d="M12 5v14M19 12l-7 7-7-7" /></svg>
   if (type === 'equals') return <svg {...p}><path d="M5 9h14M5 15h14" /></svg>
   if (type === 'sun') return <svg {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4 12H2m20 0h-2M5 5l1.5 1.5m12 12L20 20M19 5l-1.5 1.5M6.5 17.5 5 19" /></svg>
+  if (type === 'moon') return <svg {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79Z" /></svg>
+  if (type === 'arrow-left') return <svg {...p}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+  if (type === 'users') return <svg {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+  if (type === 'sparkles') return <svg {...p}><path d="m12 3-1.5 4.5L6 9l4.5 1.5L12 15l1.5-4.5L18 9l-4.5-1.5L12 3Z" /><path d="M19 15l-.75 2.25L16 18l2.25.75L19 21l.75-2.25L22 18l-2.25-.75L19 15Z" /></svg>
+  if (type === 'brain') return <svg {...p}><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" /><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" /><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" /></svg>
+  if (type === 'undo') return <svg {...p}><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" /></svg>
   if (type === 'user') return <svg {...p}><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></svg>
   if (type === 'check') return <svg {...p}><path d="m5 12 4 4L19 6" /></svg>
   if (type === 'alert') return <svg {...p}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>

@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { CircuitData, SolverResult, View, EducationalContext } from '../../lib/types'
 import { TopBar } from '../ui/TopBar'
 import { Icon } from '../icons/Icon'
@@ -41,6 +42,18 @@ export function SetupScreen({ circuit, solverResult, error, onUpdateComponentVal
 
   const eduCtx: EducationalContext | undefined = circuit?.educational_context
 
+  // AI Confidence meter
+  const confidence = useMemo(() => {
+    let score = 100
+    if (circuit?.uncertain_fields) score -= circuit.uncertain_fields.length * 5
+    if (eduCtx?.concerns) score -= eduCtx.concerns.length * 8
+    if (hasNoBattery) score -= 15
+    if (hasIncomplete) score -= 15
+    if (hasPolarityUnset) score -= 15
+    if (hasOutOfRange) score -= 5
+    return Math.max(10, Math.min(100, score))
+  }, [circuit, eduCtx, hasNoBattery, hasIncomplete, hasPolarityUnset, hasOutOfRange])
+
   return (
     <main className="page-shell">
       <TopBar step={2} onStepClick={onStepClick} currentView="confirm" />
@@ -64,6 +77,27 @@ export function SetupScreen({ circuit, solverResult, error, onUpdateComponentVal
           <div className="alert alert-danger">
             <Icon type="alert" size={18} />
             <div><strong>Error:</strong> {error}</div>
+          </div>
+        )}
+
+        {/* ─── AI Confidence Meter ─── */}
+        {circuit && (
+          <div className="confidence-meter">
+            <div className="confidence-meter-label">
+              <Icon type="sparkles" size={12} />
+              <span>AI Recognition Confidence</span>
+            </div>
+            <div className="confidence-meter-bar">
+              <div className="confidence-meter-fill" style={{ width: `${confidence}%` }} />
+            </div>
+            <div className="confidence-meter-text">
+              {confidence}% confident
+            </div>
+            {eduCtx?.likely_topic && (
+              <div className="confidence-meter-topic">
+                This looks like a <strong>{eduCtx.likely_topic}</strong> circuit
+              </div>
+            )}
           </div>
         )}
 
