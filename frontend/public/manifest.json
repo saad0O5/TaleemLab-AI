@@ -1,0 +1,27 @@
+{
+  "name": "TaleemLab — AI Circuit Simulator",
+  "short_name": "TaleemLab",
+  "description": "AI-powered virtual physics lab that transforms hand-drawn DC circuit diagrams into interactive simulations.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f9fc",
+  "theme_color": "#155eef",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-light-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

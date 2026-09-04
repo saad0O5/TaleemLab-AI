@@ -1,7 +1,12 @@
+const { parseJsonResponse } = require("./gemini");
+
 const RECOGNITION_PROMPT = `You are analyzing a hand-drawn DC electrical circuit diagram from a student's notebook.
 Identify all components (battery, resistor, switch, bulb, ammeter, voltmeter) and their
 electrical connections. Assign each component an id in the format "type_number" (e.g.
 battery_1, resistor_1, bulb_1) — number sequentially starting at 1 for each type.
+
+Beyond recognizing components, also infer the EDUCATIONAL CONTEXT — what the student
+is likely trying to learn or experiment with based on the circuit they drew.
 
 Return ONLY valid JSON in this exact schema, no explanation text:
 
@@ -18,8 +23,19 @@ Return ONLY valid JSON in this exact schema, no explanation text:
        labeled, return 0),
      "state": "open"|"closed" (switch only),
      "connects_to": ["id1","id2"]}
-  ]
+  ],
+  "uncertain_fields": ["component_id.field_name", ...] or [] if all values are clear,
+  "educational_context": {
+    "likely_topic": "string — the likely physics topic (e.g. Ohm's Law, Series Circuits, Parallel Resistance, Switch Control)",
+    "intent": "string — one sentence describing what the student appears to be trying to build or explore",
+    "observations": ["string — positive observations about the drawing, e.g. Complete loop, Values clearly labeled"],
+    "concerns": ["string — any issues or ambiguities, e.g. Resistor value unclear, No return path visible"] or []
+  }
 }
+
+The "uncertain_fields" array should contain dot-notation paths (e.g. "battery_1.voltage",
+"resistor_1.resistance") for any value you are genuinely unsure about reading clearly
+from the image. If confident in all readings, return an empty array.
 
 Rules:
 - If any resistors, bulbs, or voltmeters are connected in parallel (sharing the
@@ -33,54 +49,51 @@ Rules:
   the "polarity" field for each and let the app ask the student to confirm.
 - Every component must have at least one entry in "connects_to". If a component
   appears genuinely disconnected in the drawing, still list its nearest visible
-  connection point as a best-effort guess rather than leaving it empty.`;
+  connection point as a best-effort guess rather than leaving it empty.
+- For "educational_context.observations", include at least 1-2 positive observations.
+- For "educational_context.concerns", only include genuine issues. Return empty array if none.`;
 
 /**
  * Clean markdown fences and parse model response as JSON
- * @param {string} rawText 
+ * Uses the shared parseJsonResponse from gemini.js
+ *
+ * @param {string} rawText
  * @returns {{ success: boolean, data?: object, raw: string, error?: string }}
  */
 function parseCircuitRecognitionResponse(rawText) {
-  if (!rawText || typeof rawText !== "string") {
-    return {
-      success: false,
-      error: "recognition_parse_failed",
-      raw: String(rawText)
-    };
+  const result = parseJsonResponse(rawText);
+
+  // Additional validation: ensure required fields exist
+  if (result.success && result.data) {
+    if (!result.data.components) {
+      return {
+        success: false,
+        error: "missing_components",
+        raw: rawText,
+      };
+    }
+    if (!result.data.topology) {
+      return {
+        success: false,
+        error: "missing_topology",
+        raw: rawText,
+      };
+    }
+    // Ensure educational_context exists (even if empty)
+    if (!result.data.educational_context) {
+      result.data.educational_context = {
+        likely_topic: "DC Circuits",
+        intent: "Exploring electrical circuits",
+        observations: [],
+        concerns: [],
+      };
+    }
   }
 
-  // Strip markdown code fences if present
-  let cleaned = rawText.trim();
-  if (cleaned.startsWith("```json")) {
-    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/\s*```$/, "");
-  } else if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```\s*/, "").replace(/\s*```$/, "");
-  }
-
-  // Also check if JSON is wrapped inside text with ```json ... ``` somewhere
-  const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (codeBlockMatch) {
-    cleaned = codeBlockMatch[1].trim();
-  }
-
-  try {
-    const parsed = JSON.parse(cleaned);
-    return {
-      success: true,
-      data: parsed,
-      raw: rawText
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: "recognition_parse_failed",
-      raw: rawText,
-      message: err.message
-    };
-  }
+  return result;
 }
 
 module.exports = {
   RECOGNITION_PROMPT,
-  parseCircuitRecognitionResponse
+  parseCircuitRecognitionResponse,
 };

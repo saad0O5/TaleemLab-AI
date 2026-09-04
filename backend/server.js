@@ -2,7 +2,8 @@ require("dotenv").config();
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { callVisionModel } = require("./lib/visionModel");
+const { callGemini } = require("./lib/gemini");
+const { generateTutorResponse, generateLearningSummary } = require("./lib/aiTutor");
 const { RECOGNITION_PROMPT, parseCircuitRecognitionResponse } = require("./lib/prompts");
 const { solveCircuit, SANITY_LIMITS } = require("./lib/circuitSolver");
 const { parseCommand } = require("./lib/textCommandParser");
@@ -10,11 +11,49 @@ const { explainChange } = require("./lib/explanations");
 
 const PORT = process.env.PORT || 3000;
 
+// ─── CORS Allowlist ──────────────────────────────────────────────────
+// Set ALLOWED_ORIGINS as a comma-separated list in .env (e.g. "http://localhost:3000,https://taleemlab.vercel.app")
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+function getCorsOrigin(req) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) return origin;
+  return ALLOWED_ORIGINS[0] || '*';
+}
+
+// ─── Rate Limiting ───────────────────────────────────────────────────
+// Simple in-memory rate limiter: 30 requests per minute per IP
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX = 30;
+const rateLimitMap = new Map();
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  let entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.start > RATE_LIMIT_WINDOW) {
+    entry = { start: now, count: 0 };
+    rateLimitMap.set(ip, entry);
+  }
+  entry.count++;
+  return entry.count <= RATE_LIMIT_MAX;
+}
+
+// Clean up stale rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now - entry.start > RATE_LIMIT_WINDOW * 2) rateLimitMap.delete(ip);
+  }
+}, 5 * 60 * 1000);
+
 // Helper to send JSON responses
 function sendJSON(res, statusCode, data) {
   res.writeHead(statusCode, {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": res._corsOrigin || ALLOWED_ORIGINS[0] || '*',
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With"
   });
@@ -27,8 +66,8 @@ function parseRequestBody(req) {
     let body = "";
     req.on("data", chunk => {
       body += chunk;
-      // Protect against gigantic payloads (e.g. > 50MB)
-      if (body.length > 50 * 1024 * 1024) {
+      // Protect against oversized payloads (e.g. > 10MB — images are typically 2-8MB)
+      if (body.length > 10 * 1024 * 1024) {
         req.destroy();
         reject(new Error("Payload too large"));
       }
@@ -99,16 +138,28 @@ function applyCircuitChange(circuit, componentId, field, newValue) {
 const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const pathname = parsedUrl.pathname;
+  const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+
+  // Set CORS origin for this response
+  res._corsOrigin = getCorsOrigin(req);
 
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin": res._corsOrigin,
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
       "Access-Control-Max-Age": "86400"
     });
     return res.end();
+  }
+
+  // Rate limiting (skip for health check and OPTIONS)
+  if (!checkRateLimit(clientIp)) {
+    return sendJSON(res, 429, {
+      error: "rate_limit_exceeded",
+      message: "Too many requests. Please wait a minute and try again."
+    });
   }
 
   // Health check endpoint
@@ -135,7 +186,7 @@ const server = http.createServer(async (req, res) => {
 
       let rawResponse;
       try {
-        rawResponse = await callVisionModel(imageBase64, RECOGNITION_PROMPT);
+        rawResponse = await callGemini(RECOGNITION_PROMPT, imageBase64);
       } catch (visionErr) {
         return sendJSON(res, 500, {
           error: "vision_model_error",
@@ -149,6 +200,36 @@ const server = http.createServer(async (req, res) => {
           error: "recognition_parse_failed",
           raw: parsedResult.raw
         });
+      }
+
+      // Validate schema before passing to solver
+      const data = parsedResult.data;
+      const validTopologies = ["series", "series_parallel"];
+      const validTypes = ["battery", "resistor", "switch", "bulb", "ammeter", "voltmeter"];
+      if (!data.topology || !validTopologies.includes(data.topology)) {
+        return sendJSON(res, 422, {
+          error: "recognition_invalid_topology",
+          message: `Topology must be 'series' or 'series_parallel', got '${data.topology}'.`
+        });
+      }
+      if (!Array.isArray(data.components) || data.components.length === 0) {
+        return sendJSON(res, 422, {
+          error: "recognition_no_components",
+          message: "No components were recognized in the image."
+        });
+      }
+      for (const c of data.components) {
+        // Normalize IDs to lowercase to prevent case mismatch with text parser
+        c.id = c.id.toLowerCase();
+        if (!c.id || !c.type || !validTypes.includes(c.type)) {
+          return sendJSON(res, 422, {
+            error: "recognition_invalid_component",
+            message: `Invalid component: ${JSON.stringify(c)}. Type must be one of: ${validTypes.join(', ')}.`
+          });
+        }
+        if (!Array.isArray(c.connects_to)) {
+          c.connects_to = []; // auto-fix missing connects_to
+        }
       }
 
       return sendJSON(res, 200, parsedResult.data);
@@ -367,6 +448,81 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // POST /api/explain-prediction
+  if (pathname === "/api/explain-prediction" && req.method === "POST") {
+    try {
+      const body = await parseRequestBody(req);
+      const {
+        predictionKey, direction, studentAnswer, correct,
+        oldValue, newValue, oldCurrent, newCurrent, studentProfile
+      } = body || {};
+
+      if (!predictionKey || !direction || !studentAnswer) {
+        return sendJSON(res, 400, {
+          error: "missing_fields",
+          message: "Request must contain predictionKey, direction, studentAnswer, correct."
+        });
+      }
+
+      const aiResponse = await generateTutorResponse({
+        predictionKey, direction, studentAnswer,
+        correct: Boolean(correct),
+        oldValue, newValue, oldCurrent, newCurrent,
+        studentProfile: studentProfile || {}
+      });
+
+      if (aiResponse) {
+        return sendJSON(res, 200, { ...aiResponse, isAI: true });
+      }
+
+      // Fallback: rule-based explanation
+      const { explainChange } = require("./lib/explanations");
+      const field = predictionKey === "state" ? "state" : predictionKey;
+      const fallbackText = explainChange(field, oldValue, newValue, { oldCurrent, newCurrent });
+      return sendJSON(res, 200, {
+        headline: correct ? "You got it!" : "Not quite",
+        explanation: fallbackText,
+        followUp: "",
+        insight: "",
+        isAI: false
+      });
+    } catch (err) {
+      return sendJSON(res, 500, {
+        error: "explain_error",
+        message: err.message
+      });
+    }
+  }
+
+  // POST /api/learning-summary
+  if (pathname === "/api/learning-summary" && req.method === "POST") {
+    try {
+      const body = await parseRequestBody(req);
+      const studentProfile = body?.studentProfile || body || {};
+
+      const aiSummary = await generateLearningSummary(studentProfile);
+
+      if (aiSummary) {
+        return sendJSON(res, 200, { ...aiSummary, isAI: true });
+      }
+
+      // Fallback: generic encouragement
+      const total = studentProfile.totalPredictions || 0;
+      const accuracy = studentProfile.accuracy ? Math.round(studentProfile.accuracy * 100) : 0;
+      return sendJSON(res, 200, {
+        summary: total > 0
+          ? `You've made ${total} predictions with ${accuracy}% accuracy. Keep experimenting to build your understanding!`
+          : "Start making predictions to see your personalized learning summary here.",
+        isAI: false
+      });
+    } catch (err) {
+      return sendJSON(res, 500, {
+        error: "summary_error",
+        message: err.message
+      });
+    }
+  }
+
   // Serve Interactive Test UI for GET / or GET /index.html
   if (pathname === "/" || pathname === "/index.html") {
     const htmlPath = path.join(__dirname, "public", "index.html");
@@ -388,6 +544,8 @@ if (require.main === module) {
     console.log(`- POST /api/solve-circuit`);
     console.log(`- POST /api/apply-change`);
     console.log(`- POST /api/text-command`);
+    console.log(`- POST /api/explain-prediction`);
+    console.log(`- POST /api/learning-summary`);
     console.log(`- GET  /api/health`);
     console.log(`======================================================\n`);
   });

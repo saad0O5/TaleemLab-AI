@@ -12,6 +12,7 @@ export function CameraModal({ onCapture, onClose, onFallback }: CameraModalProps
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [status, setStatus] = useState<'starting' | 'ready' | 'error'>('starting')
+  const [showSymbols, setShowSymbols] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -95,6 +96,31 @@ export function CameraModal({ onCapture, onClose, onFallback }: CameraModalProps
             <video ref={videoRef} playsInline muted style={{ width: '100%', display: 'block' }} />
             {status === 'starting' && (
               <p style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', margin: 0, color: '#fff', fontSize: '13px', minHeight: '180px' }}>Starting camera…</p>
+            )}
+          </div>
+          {/* Compact symbol reference */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+            <button
+              onClick={() => setShowSymbols(!showSymbols)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 0, background: 'none', cursor: 'pointer', padding: '4px 0', color: 'var(--foreground)' }}
+            >
+              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--muted)', letterSpacing: '0.5px' }}>SYMBOL REFERENCE</span>
+              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{showSymbols ? '▾' : '▸'}</span>
+            </button>
+            {showSymbols && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '8px' }}>
+                {[
+                  { name: 'Battery', glyph: <><line x1="8" y1="4" x2="8" y2="20" strokeWidth="2.5"/><line x1="16" y1="7" x2="16" y2="17" strokeWidth="1.5"/></> },
+                  { name: 'Resistor', glyph: <path d="M2 12h3l2-4 2.5 8 2.5-8 2 4h3" /> },
+                  { name: 'Switch', glyph: <><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><line x1="4" y1="12" x2="10" y2="6"/></> },
+                  { name: 'Bulb', glyph: <><circle cx="8" cy="10" r="5"/><line x1="5.5" y1="7.5" x2="10.5" y2="12.5"/><line x1="10.5" y1="7.5" x2="5.5" y2="12.5"/></> },
+                ].map(({ name, glyph }) => (
+                  <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', background: 'var(--surface-soft)', borderRadius: '3px' }}>
+                    <svg width="28" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{glyph}</svg>
+                    <span style={{ fontSize: '11px', fontWeight: '600' }}>{name}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <button

@@ -1,4 +1,4 @@
-import { CircuitData, SolverResult } from "./types";
+import { CircuitData, SolverResult, TutorResponse } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -51,4 +51,50 @@ export async function sendTextCommand(
   text: string
 ): Promise<TextCommandResult | { recognized: false }> {
   return postJSON<TextCommandResult | { recognized: false }>("/api/text-command", { circuit, text });
+}
+
+// ─── AI Tutor Endpoints ──────────────────────────────────────────────
+
+export interface ExplainPredictionInput {
+  predictionKey: string;
+  direction: "up" | "down";
+  studentAnswer: "up" | "down" | "same";
+  correct: boolean;
+  oldValue?: number;
+  newValue?: number | string;
+  oldCurrent?: number;
+  newCurrent?: number;
+  studentProfile: StudentProfileForAI;
+}
+
+export interface StudentProfileForAI {
+  totalPredictions: number;
+  accuracy: number;
+  conceptAccuracy: Record<string, number>;
+  topMisconceptions: { id: string; label: string; description: string; confidence: number }[];
+  recentStreak?: string;
+}
+
+/**
+ * Get a personalized AI tutor explanation after a prediction.
+ * Returns null if the AI call fails (caller should fall back to templates).
+ */
+export async function explainPrediction(input: ExplainPredictionInput): Promise<(TutorResponse & { isAI: boolean }) | null> {
+  try {
+    return await postJSON<TutorResponse & { isAI: boolean }>("/api/explain-prediction", input);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get an AI-generated learning summary for the progress page.
+ * Returns null if the AI call fails.
+ */
+export async function getLearningSummary(profile: StudentProfileForAI): Promise<{ summary: string; isAI: boolean } | null> {
+  try {
+    return await postJSON<{ summary: string; isAI: boolean }>("/api/learning-summary", { studentProfile: profile });
+  } catch {
+    return null;
+  }
 }

@@ -8,10 +8,20 @@ export interface CircuitComponent {
   connects_to: string[];
 }
 
+/** Educational context inferred by AI from the student's drawing */
+export interface EducationalContext {
+  likely_topic?: string;
+  intent?: string;
+  observations?: string[];
+  concerns?: string[];
+}
+
 export interface CircuitData {
   topology: "series" | "series_parallel";
   parallel_groups: string[][];
   components: CircuitComponent[];
+  uncertain_fields?: string[];
+  educational_context?: EducationalContext;
 }
 
 export interface ComponentState {
@@ -41,7 +51,7 @@ export interface SolverResult {
   explanation?: string;
 }
 
-export type View = "capture" | "confirm" | "simulate";
+export type View = "capture" | "confirm" | "simulate" | "progress";
 
 export type PredictionKey = "resistance" | "voltage" | "state";
 
@@ -53,9 +63,22 @@ export interface Prediction {
   componentId?: string;
 }
 
+/** AI-generated tutor response after a prediction */
+export interface TutorResponse {
+  headline: string;
+  explanation: string;
+  followUp: string;
+  insight: string;
+  isAI: boolean;
+}
+
 export interface Explanation {
   correct: boolean;
   text: string;
+  isAI: boolean;
+  followUp?: string;
+  insight?: string;
+  predictionKey?: PredictionKey;
 }
 
 // Sanity limits for circuit values - must match backend/lib/circuitSolver.js

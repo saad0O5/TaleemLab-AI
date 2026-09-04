@@ -32,10 +32,25 @@ function solveCircuit(circuit) {
   const { components, topology } = circuit;
   const flags = [];
 
-  // --- Value sanity checks (run first, non-blocking) ---
+  // --- Value sanity checks (run first) ---
+  // Negative resistance is blocking — physically impossible, don't compute.
+  const hasNegativeResistance = components.some(c =>
+    c.resistance !== undefined && c.resistance !== null && c.resistance < SANITY_LIMITS.resistance.min
+  );
+  if (hasNegativeResistance) {
+    return {
+      current: 0,
+      voltage: 0,
+      totalResistance: null,
+      componentStates: [],
+      flags: [{ type: "value_out_of_range", componentId: components.find(c => c.resistance < 0).id, field: "resistance", value: components.find(c => c.resistance < 0).resistance }],
+      note: "Negative resistance is not physically possible — resistance always opposes current flow. Please correct the value."
+    };
+  }
+
   for (const c of components) {
     if (c.resistance !== undefined && c.resistance !== null) {
-      if (c.resistance < SANITY_LIMITS.resistance.min || c.resistance > SANITY_LIMITS.resistance.max) {
+      if (c.resistance > SANITY_LIMITS.resistance.max) {
         flags.push({ type: "value_out_of_range", componentId: c.id, field: "resistance", value: c.resistance });
       }
     }
@@ -60,6 +75,19 @@ function solveCircuit(circuit) {
     };
   }
 
+  // Check for 0V batteries — physically meaningless
+  const zeroVoltage = batteries.filter(b => b.voltage === 0 || b.voltage === undefined);
+  if (zeroVoltage.length > 0 && batteries.every(b => !b.voltage || b.voltage === 0)) {
+    return {
+      current: 0,
+      voltage: 0,
+      totalResistance: null,
+      componentStates: [],
+      flags: [{ type: "value_out_of_range", componentId: zeroVoltage[0].id, field: "voltage", value: 0 }],
+      note: "A battery must have a positive voltage to drive current. Please set a voltage value."
+    };
+  }
+
   const unsetPolarity = batteries.length > 1 && batteries.some(b => !b.polarity);
   if (unsetPolarity) {
     flags.push("battery_polarity_unset");
@@ -74,6 +102,9 @@ function solveCircuit(circuit) {
   const circuitOpen = switches.some(s => s.state === "open");
 
   if (circuitOpen) {
+    // In an open circuit: battery still shows its EMF, the open switch has
+    // the full source voltage across it (no current → no drop elsewhere).
+    const openSwitchIds = switches.filter(s => s.state === "open").map(s => s.id);
     return {
       current: 0,
       voltage,
@@ -82,11 +113,13 @@ function solveCircuit(circuit) {
         id: c.id,
         type: c.type,
         current: 0,
-        voltage: 0,
+        voltage: c.type === "battery" ? (c.polarity === "reversed" ? -c.voltage : c.voltage)
+               : openSwitchIds.includes(c.id) ? voltage
+               : 0,
         brightness: c.type === "bulb" ? 0 : null
       })),
       flags,
-      note: "Circuit open — switch is off, no current flows."
+      note: "Circuit open — switch is off, no current flows. Full voltage appears across the open switch."
     };
   }
 
@@ -131,8 +164,13 @@ function solveCircuit(circuit) {
     let parallelContribution = 0;
     groups.forEach((group, index) => {
       const groupElements = resistiveElements.filter(c => group.includes(c.id));
-      const reciprocalSum = groupElements.reduce((sum, c) => sum + 1 / c.resistance, 0);
-      const req = reciprocalSum > 0 ? 1 / reciprocalSum : 0;
+      const reciprocalSum = groupElements.reduce((sum, c) => {
+        if (c.resistance <= 0) return sum; // skip 0Ω (short circuit handled separately)
+        return sum + 1 / c.resistance;
+      }, 0);
+      // If any element in the group has 0Ω, the group is a short circuit (Req = 0)
+      const hasShort = groupElements.some(c => c.resistance !== undefined && c.resistance <= 0);
+      const req = hasShort ? 0 : (reciprocalSum > 0 ? 1 / reciprocalSum : 0);
       groupEquivalentResistance[index] = req;
       parallelContribution += req;
     });
@@ -143,7 +181,15 @@ function solveCircuit(circuit) {
 
     totalResistance = parallelContribution + seriesContribution;
   } else {
-    throw new Error(`Unsupported topology: ${effectiveTopology}`);
+    // Unsupported topology — return gracefully instead of throwing
+    return {
+      current: 0,
+      voltage: 0,
+      totalResistance: null,
+      componentStates: [],
+      flags: ["incomplete_circuit"],
+      note: `This circuit topology ('${effectiveTopology}') isn't supported yet. Only series and series-parallel circuits are recognized.`
+    };
   }
 
   let effectiveResistance = totalResistance;

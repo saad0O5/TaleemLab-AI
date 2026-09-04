@@ -1,15 +1,22 @@
 import { CircuitData } from './types'
 
-export type ExampleKey = 'clean_circuit' | 'battery_polarity_unset_example' | 'no_battery_example' | 'incomplete_circuit_example' | 'value_out_of_range_example' | 'ideal_zero_resistance_example'
+export type ExampleKey = 'clean_circuit' | 'clean_series_parallel_example' | 'battery_polarity_unset_example' | 'no_battery_example' | 'incomplete_circuit_example' | 'value_out_of_range_example' | 'ideal_zero_resistance_example'
 
 export const exampleLabels: Record<ExampleKey, string> = {
   clean_circuit: 'Clean circuit',
+  clean_series_parallel_example: 'Series-parallel circuit',
   battery_polarity_unset_example: 'Battery polarity unset',
   no_battery_example: 'No battery',
   incomplete_circuit_example: 'Incomplete circuit',
   value_out_of_range_example: 'Value out of range',
   ideal_zero_resistance_example: 'Ideal zero resistance',
 }
+
+/** User-facing curated examples with friendly display names */
+export const curatedExamples: { key: ExampleKey; name: string; description: string }[] = [
+  { key: 'clean_circuit', name: 'Simple series circuit', description: 'Battery, resistor, switch & bulb in series' },
+  { key: 'clean_series_parallel_example', name: 'Series-parallel circuit', description: 'Two resistors in parallel with a series switch' },
+]
 
 export const mockCircuitExamples: Record<ExampleKey, CircuitData> = {
   clean_circuit: {
@@ -20,6 +27,17 @@ export const mockCircuitExamples: Record<ExampleKey, CircuitData> = {
       { id: 'resistor_1', type: 'resistor', resistance: 470, connects_to: ['switch_1'] },
       { id: 'switch_1', type: 'switch', state: 'open', connects_to: ['bulb_1'] },
       { id: 'bulb_1', type: 'bulb', resistance: 30, connects_to: ['battery_1'] },
+    ],
+  },
+  // Clean series-parallel: battery + (R1 ∥ R2) + switch — no flags expected
+  clean_series_parallel_example: {
+    topology: 'series_parallel',
+    parallel_groups: [['resistor_1', 'resistor_2']],
+    components: [
+      { id: 'battery_1', type: 'battery', voltage: 9, polarity: 'same', connects_to: ['resistor_1', 'resistor_2'] },
+      { id: 'resistor_1', type: 'resistor', resistance: 200, connects_to: ['switch_1'] },
+      { id: 'resistor_2', type: 'resistor', resistance: 300, connects_to: ['switch_1'] },
+      { id: 'switch_1', type: 'switch', state: 'open', connects_to: ['battery_1'] },
     ],
   },
   battery_polarity_unset_example: {

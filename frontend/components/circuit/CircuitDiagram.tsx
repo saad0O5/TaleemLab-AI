@@ -163,7 +163,7 @@ export function CircuitDiagram({ circuit, componentStates, closed, current }: Ci
   const n = units.length
   const size = n > 6 ? Math.max(22, Math.round(44 * 6 / n)) : 44
 
-  return <div className={`sim-diagram ${closed ? 'is-flowing' : ''}`} style={{ '--pulse-speed': `${Math.max(.18, 2.8 - current * 12)}s` } as React.CSSProperties}>
+  return <div className={`sim-diagram ${closed ? 'is-flowing' : ''}`} style={{ '--pulse-speed': `${Math.max(0.2, 2.5 - Math.sqrt(current) * 1.05)}s` } as React.CSSProperties}>
     <svg viewBox="0 0 560 300" role="img" aria-label="Interactive rectangular circuit diagram">
       <path className="circuit-wire" d={`M${RECT.x1} ${RECT.y1}H${RECT.x2}V${RECT.y2}H${RECT.x1}V${RECT.y1}`} />
       {units.map((unit, i) => {
