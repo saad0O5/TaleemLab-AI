@@ -1,0 +1,17 @@
+# === Deploy artifacts ===
+.vercel-tmp/
+render.yaml
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+
+# === Editor ===
+.vscode/
+.idea/
+*.swp
+
+# === Environment ===
+.env
+.env.local
+.env*.local
