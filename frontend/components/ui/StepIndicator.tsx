@@ -1,11 +1,11 @@
 import { Icon } from '../icons/Icon'
 import { View } from '../../lib/types'
 
-const STEP_LABELS = ['Capture', 'Confirm', 'Simulate', 'Progress'] as const
-const STEP_VIEWS: View[] = ['capture', 'confirm', 'simulate', 'progress']
+const STEP_LABELS = ['Capture', 'Confirm', 'Simulate', 'Progress', 'Evaluation'] as const
+const STEP_VIEWS: View[] = ['capture', 'confirm', 'simulate', 'progress', 'evaluation']
 
 interface StepIndicatorProps {
-  step: 1 | 2 | 3 | 4
+  step: 1 | 2 | 3 | 4 | 5
   onStepClick?: (step: number) => void
   currentView?: View
 }
@@ -13,7 +13,7 @@ interface StepIndicatorProps {
 export function StepIndicator({ step, onStepClick, currentView }: StepIndicatorProps) {
   return (
     <div className="steps">
-      {[1, 2, 3, 4].map((s, i) => {
+      {[1, 2, 3, 4, 5].map((s, i) => {
         const isDone = s < step
         const isActive = s === step
         const isClickable = onStepClick && (isDone || isActive)

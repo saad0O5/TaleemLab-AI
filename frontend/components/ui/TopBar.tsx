@@ -4,7 +4,7 @@ import { StepIndicator } from './StepIndicator'
 import { View } from '../../lib/types'
 
 interface TopBarProps {
-  step: 1 | 2 | 3 | 4
+  step: 1 | 2 | 3 | 4 | 5
   onToggleTheme?: () => void
   onStepClick?: (step: number) => void
   currentView?: View

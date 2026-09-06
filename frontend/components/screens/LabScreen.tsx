@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   CircuitData, ComponentState, View, PredictionKey, Prediction,
   Explanation, SolverFlag, SANITY_LIMITS
@@ -9,14 +9,19 @@ import {
   StudentModel, getSRMSummary, getEvidenceSummary, pickNextInvestigation,
   MISCONCEPTIONS
 } from '../../lib/studentModel'
-import { getLatestDiscovery, getChallengePrompt } from '../../lib/engagement'
+import { getLatestDiscovery, getChallengePrompt, getDiscoveries } from '../../lib/engagement'
 import { TopBar } from '../ui/TopBar'
 import { AITutorCard } from '../ui/AITutorCard'
 import { DiscoveryCard } from '../ui/DiscoveryCard'
 import { ChallengePrompt } from '../ui/ChallengePrompt'
+import { AIAskCard } from '../ai/AIAskCard'
+import { useToast } from '../ui/Toast'
 import { Icon } from '../icons/Icon'
 import { CircuitDiagram } from '../circuit/CircuitDiagram'
+import { CapacitorPanel } from '../circuit/CapacitorPanel'
 import { Stat } from '../circuit/Stat'
+import { useSoundEffects } from '../../hooks/useSoundEffects'
+import { CircuitContext } from '../../lib/api'
 
 const PREDICTION_HINTS: Record<PredictionKey, string> = {
   resistance: "Remember Ohm's Law relates voltage, current, and resistance -- what does increasing one side do to the other?",
@@ -81,6 +86,36 @@ export function LabScreen(props: LabScreenProps) {
 
   const [showHint, setShowHint] = useState(false)
   const [showCommand, setShowCommand] = useState(false)
+  const [followUpQuestion, setFollowUpQuestion] = useState<string | undefined>(undefined)
+  const sfx = useSoundEffects()
+  const { addToast } = useToast()
+  const prevExplanationRef = useRef<Explanation | null>(null)
+  const prevDiscoveryCountRef = useRef(0)
+
+  // Sound + toast: correct/wrong when explanation arrives
+  useEffect(() => {
+    if (explanation && explanation !== prevExplanationRef.current) {
+      if (explanation.correct) {
+        sfx.correct()
+        addToast('success', explanation.text ? explanation.text.slice(0, 60) : 'Correct prediction!')
+      } else {
+        sfx.wrong()
+        addToast('error', explanation.text ? explanation.text.slice(0, 60) : 'Not quite — try again')
+      }
+      prevExplanationRef.current = explanation
+    }
+  }, [explanation, sfx, addToast])
+
+  // Sound + toast: discovery milestone earned
+  const discoveries = getDiscoveries(studentModel)
+  useEffect(() => {
+    if (discoveries.length > prevDiscoveryCountRef.current && prevDiscoveryCountRef.current > 0) {
+      sfx.discovery()
+      const latest = discoveries[discoveries.length - 1]
+      addToast('discovery', `Discovery: ${latest?.title || 'New milestone!'}`)
+    }
+    prevDiscoveryCountRef.current = discoveries.length
+  }, [discoveries.length, sfx, addToast])
 
   // Keyboard shortcuts: 1=increases, 2=decreases, 3=same (for predictions)
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -116,6 +151,10 @@ export function LabScreen(props: LabScreenProps) {
     if (ratio <= 0.75) return { label: 'Good grasp', className: 'level-proficient', percent }
     return { label: 'Strong understanding', className: 'level-advanced', percent }
   }
+
+  // Check if circuit has a capacitor
+  const capacitorState = componentStates.find(cs => cs.type === 'capacitor') as (ComponentState & { tau?: number }) | undefined
+  const capacitorComponent = circuit?.components.find(c => c.type === 'capacitor')
 
   return (
     <main className="page-shell">
@@ -162,15 +201,47 @@ export function LabScreen(props: LabScreenProps) {
             </div>
             <CircuitDiagram circuit={circuit} componentStates={componentStates} closed={closed} current={current} />
             <div className="stats-grid">
-              <Stat label="Voltage" value={voltage.toString()} unit="V" />
-              <Stat label="Resistance" value={resistance.toString()} unit={'\u03A9'} />
-              <Stat label="Current" value={capped ? 'Very high' : current.toFixed(3)} unit={capped ? 'real components differ' : 'A'} warning={capped} />
-              <Stat label="Brightness" value={brightness.toString()} unit="%" />
+              <Stat label="Voltage" value={voltage.toString()} unit="V" color="#dc2626" />
+              <Stat label="Resistance" value={resistance.toString()} unit={'\u03A9'} color="#d97706" />
+              <Stat label="Current" value={capped ? 'Very high' : current.toFixed(3)} unit={capped ? 'real components differ' : 'A'} warning={capped} color="#0d9488" />
+              <Stat label="Brightness" value={brightness.toString()} unit="%" color="#eab308" />
             </div>
           </div>
 
           {/* AI Tutor Card -- the hero */}
-          <AITutorCard explanation={explanation} aiThinking={aiThinking} />
+          <AITutorCard
+            explanation={explanation}
+            aiThinking={aiThinking}
+            onFollowUpClick={(q) => setFollowUpQuestion(q)}
+          />
+
+          {/* AI Ask Anything */}
+          <AIAskCard
+            circuitContext={{
+              voltage,
+              current,
+              closed,
+              topology: circuit?.topology,
+              components: circuit?.components.map(c => ({
+                id: c.id,
+                type: c.type,
+                voltage: c.voltage,
+                resistance: c.resistance,
+                state: c.state,
+              })),
+            }}
+            initialQuestion={followUpQuestion}
+          />
+
+          {/* Capacitor RC panel — only shown when capacitor is in circuit */}
+          {capacitorState && capacitorComponent && resistance > 0 && (
+            <CapacitorPanel
+              tau={(capacitorState as any).tau || (resistance * (capacitorComponent.capacitance || 100) * 1e-6)}
+              sourceVoltage={voltage}
+              totalResistance={resistance}
+              closed={closed}
+            />
+          )}
         </section>
 
         {/* ─── CENTER: Controls ─── */}
@@ -245,7 +316,11 @@ export function LabScreen(props: LabScreenProps) {
             </div>
             <button
               className={`switch-toggle ${closed ? 'closed' : ''}`}
-              onClick={onToggleSwitch}
+              onClick={() => {
+                sfx.toggle()
+                onToggleSwitch()
+                addToast('info', closed ? 'Switch opened — circuit off' : 'Switch closed — circuit on')
+              }}
               aria-label="Toggle circuit switch"
             />
           </div>
@@ -286,7 +361,7 @@ export function LabScreen(props: LabScreenProps) {
                 <span className="progress-count">{totalCorrect}/{entries.length} correct</span>
               </div>
               {onUndo && canUndo && (
-                <button className="undo-btn" onClick={onUndo}>
+                <button className="undo-btn" onClick={() => { sfx.undo(); onUndo?.() }}>
                   <Icon type="undo" size={12} /> Undo last prediction
                 </button>
               )}

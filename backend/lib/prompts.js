@@ -1,9 +1,9 @@
 const { parseJsonResponse } = require("./gemini");
 
 const RECOGNITION_PROMPT = `You are analyzing a hand-drawn DC electrical circuit diagram from a student's notebook.
-Identify all components (battery, resistor, switch, bulb, ammeter, voltmeter) and their
+Identify all components (battery, resistor, switch, bulb, ammeter, voltmeter, capacitor, diode) and their
 electrical connections. Assign each component an id in the format "type_number" (e.g.
-battery_1, resistor_1, bulb_1) — number sequentially starting at 1 for each type.
+battery_1, resistor_1, bulb_1, capacitor_1, diode_1) — number sequentially starting at 1 for each type.
 
 Beyond recognizing components, also infer the EDUCATIONAL CONTEXT — what the student
 is likely trying to learn or experiment with based on the circuit they drew.
@@ -14,19 +14,20 @@ Return ONLY valid JSON in this exact schema, no explanation text:
   "topology": "series" or "series_parallel",
   "parallel_groups": [["id1","id2"], ...] or [] if none,
   "components": [
-    {"id": "string", "type": "battery|resistor|switch|bulb|ammeter|voltmeter",
+    {"id": "string", "type": "battery|resistor|switch|bulb|ammeter|voltmeter|capacitor|diode",
      "voltage": number (battery only),
      "polarity": "same" or "reversed" (battery only, ONLY if you are confident of
        the orientation from the symbol; if uncertain or if multiple batteries are
        present, omit this field entirely rather than guessing),
      "resistance": number (resistor and bulb only; if a bulb has no resistance
        labeled, return 0),
+     "capacitance": number (capacitor only, in microfarads; default 100 if unlabeled),
      "state": "open"|"closed" (switch only),
      "connects_to": ["id1","id2"]}
   ],
   "uncertain_fields": ["component_id.field_name", ...] or [] if all values are clear,
   "educational_context": {
-    "likely_topic": "string — the likely physics topic (e.g. Ohm's Law, Series Circuits, Parallel Resistance, Switch Control)",
+    "likely_topic": "string — the likely physics topic (e.g. Ohm's Law, Series Circuits, Parallel Resistance, RC Circuits, Diode Rectification)",
     "intent": "string — one sentence describing what the student appears to be trying to build or explore",
     "observations": ["string — positive observations about the drawing, e.g. Complete loop, Values clearly labeled"],
     "concerns": ["string — any issues or ambiguities, e.g. Resistor value unclear, No return path visible"] or []

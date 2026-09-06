@@ -16,7 +16,7 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
     );
   }
 
-  const modelName = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
   const timeoutMs = options.timeoutMs || 30000;
 
   // Build content parts
@@ -64,12 +64,13 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
     contents: [{ parts }],
   });
 
-  const FALLBACK_MODELS = [];
+  const FALLBACK_MODELS = ["gemini-1.5-flash"];
   const MAX_RETRIES = 2;
   const modelsToTry = [modelName, ...FALLBACK_MODELS.filter(m => m !== modelName)];
 
   for (const model of modelsToTry) {
-    const tryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    // API key sent via header (Google's preferred method) — NOT in URL
+    const tryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       // Backoff: 1s, 2s, 4s
@@ -84,7 +85,10 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
       try {
         response = await fetch(tryUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey
+          },
           body,
           signal: controller.signal,
         });
@@ -124,11 +128,17 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
         ?.map((p) => p.text || "")
         .join("") || "";
 
+      // Approximate token count from usage metadata
+      const approxTokens = data?.usageMetadata?.totalTokenCount || Math.ceil((text.length || 100) / 4);
+
       // Retry once if response is empty
       if (!text || text.trim().length === 0) {
         const retryResponse = await fetch(tryUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": apiKey
+          },
           body,
         });
         if (retryResponse.ok) {
@@ -136,15 +146,39 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
           const retryText = retryData?.candidates?.[0]?.content?.parts
             ?.map((p) => p.text || "")
             .join("") || "";
-          if (retryText) return retryText;
+          if (retryText) {
+            trackUsage(model, retryData?.usageMetadata?.totalTokenCount || Math.ceil(retryText.length / 4));
+            return retryText;
+          }
         }
       }
 
-      if (text) return text;
+      if (text) {
+        trackUsage(model, approxTokens);
+        return text;
+      }
     }
   }
 
   throw new Error("All Gemini models unavailable — please try again later.");
+}
+
+// ─── Basic usage tracking ────────────────────────────────────────────
+let dailyCallCount = 0;
+let dailyCallDate = new Date().toISOString().slice(0, 10);
+const DAILY_WARN_THRESHOLD = 100; // warn when exceeding this many calls/day
+
+function trackUsage(model, approxTokens) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== dailyCallDate) {
+    dailyCallCount = 0;
+    dailyCallDate = today;
+  }
+  dailyCallCount++;
+  console.log(`[Gemini] model=${model} calls_today=${dailyCallCount} approx_tokens=${approxTokens}`);
+  if (dailyCallCount === DAILY_WARN_THRESHOLD) {
+    console.warn(`[Gemini] Daily call threshold reached (${DAILY_WARN_THRESHOLD}). Monitor usage.`);
+  }
 }
 
 /**
@@ -186,4 +220,4 @@ function parseJsonResponse(rawText) {
   }
 }
 
-module.exports = { callGemini, parseJsonResponse };
+module.exports = { callGemini, parseJsonResponse, trackUsage };

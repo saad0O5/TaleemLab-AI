@@ -13,12 +13,31 @@ interface EvaluationScreenProps {
 export function EvaluationScreen({ studentProfile, onViewChange }: EvaluationScreenProps) {
   const [evaluation, setEvaluation] = useState<AIEvaluation | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  const fetchEvaluation = () => {
+    setLoading(true)
+    setError(false)
+    getEvaluation(studentProfile)
+      .then(result => {
+        if (result) {
+          setEvaluation(result)
+        } else {
+          // null means API failed OR no data — check if there's enough data
+          const hasEnoughData = studentProfile.totalPredictions >= 3
+          if (hasEnoughData) {
+            setError(true) // API failed
+          } else {
+            setEvaluation(null) // genuinely not enough data
+          }
+        }
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false))
+  }
 
   useEffect(() => {
-    getEvaluation(studentProfile).then(result => {
-      setEvaluation(result)
-      setLoading(false)
-    })
+    fetchEvaluation()
   }, [])
 
   const levelColor = (level: string) => {
@@ -32,9 +51,9 @@ export function EvaluationScreen({ studentProfile, onViewChange }: EvaluationScr
 
   const levelLabel = (level: string) => {
     switch (level) {
-      case 'strong': return 'Strong'
-      case 'developing': return 'Developing'
-      case 'needs_work': return 'Needs work'
+      case 'strong': return '\u2713 Strong'
+      case 'developing': return '\u25CB Developing'
+      case 'needs_work': return '\u25B3 Needs work'
       default: return level
     }
   }
@@ -64,6 +83,22 @@ export function EvaluationScreen({ studentProfile, onViewChange }: EvaluationScr
             <div className="skeleton skeleton-text" />
             <div className="skeleton skeleton-text" />
             <div className="skeleton skeleton-card" />
+          </div>
+        ) : error ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">
+              <Icon type="alert" size={32} />
+            </div>
+            <h2>AI evaluation temporarily unavailable</h2>
+            <p>The AI tutor couldn't generate your evaluation. This might be due to a network issue or service limit. Your progress data is safe.</p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+              <button className="btn btn-primary" onClick={fetchEvaluation}>
+                Retry
+              </button>
+              <button className="btn btn-outline" onClick={() => onViewChange('progress')}>
+                Back to progress
+              </button>
+            </div>
           </div>
         ) : !evaluation ? (
           <div className="empty-state">

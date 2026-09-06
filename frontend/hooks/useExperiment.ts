@@ -151,8 +151,8 @@ export function useExperiment() {
         setOriginalCircuit(ex)
         setCorrectionComparison(null)
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to solve example circuit.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to solve example circuit.')
     } finally {
       setLoading(false)
     }
@@ -183,8 +183,8 @@ export function useExperiment() {
       setView('confirm')
       setOriginalCircuit(recognized)
       setCorrectionComparison(null)
-    } catch (err: any) {
-      setError(err.message || 'Failed to process circuit image.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to process circuit image.')
     } finally {
       setLoading(false)
     }
@@ -240,8 +240,8 @@ export function useExperiment() {
       if (field === 'voltage') setVoltage(value)
       if (field === 'resistance') setResistance(value)
       if (field === 'state') setClosed(value === 'closed')
-    } catch (err: any) {
-      setError(err.message || 'Failed to update component.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update component.')
     } finally {
       setLoading(false)
     }
@@ -270,8 +270,8 @@ export function useExperiment() {
       const res = await solveCircuit(updatedCircuit)
       setCircuit(updatedCircuit)
       setSolverResult(res)
-    } catch (err: any) {
-      setError(err.message || 'Failed to add battery.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add battery.')
     } finally {
       setLoading(false)
     }
@@ -291,8 +291,8 @@ export function useExperiment() {
       const res = await solveCircuit(updatedCircuit)
       setCircuit(updatedCircuit)
       setSolverResult(res)
-    } catch (err: any) {
-      setError(err.message || 'Failed to auto-complete circuit.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to auto-complete circuit.')
     } finally {
       setLoading(false)
     }
@@ -381,7 +381,6 @@ export function useExperiment() {
       setCircuit(updatedCircuit)
       setSolverResult(res)
 
-      const newValue = key === 'state' ? next : next
       const oldValue = key === 'resistance' ? resistance : key === 'voltage' ? voltage : undefined
 
       if (key === 'resistance') setResistance(next as number)
@@ -412,7 +411,7 @@ export function useExperiment() {
         studentAnswer: answer,
         correct,
         oldValue,
-        newValue,
+        newValue: next,
         oldCurrent,
         newCurrent: res.current,
         studentProfile: profile,
@@ -438,8 +437,8 @@ export function useExperiment() {
         })
       }
       setAiThinking(false)
-    } catch (err: any) {
-      setError(err.message || 'Failed to apply change.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to apply change.')
       setAiThinking(false)
     } finally {
       setLoading(false)
@@ -490,14 +489,14 @@ export function useExperiment() {
             direction = appliedChange.newValue === 'closed' ? 'up' : 'down'
           } else {
             const oldValue = key === 'resistance' ? resistance : voltage
-            direction = appliedChange.newValue > oldValue ? 'up' : 'down'
+            direction = Number(appliedChange.newValue) > oldValue ? 'up' : 'down'
           }
           requestChange(key, appliedChange.newValue, direction, appliedChange.componentId)
           setCommand('')
         }
       }
-    } catch (err: any) {
-      setCommandMessage(err.message || 'Failed to process command.')
+    } catch (err: unknown) {
+      setCommandMessage(err instanceof Error ? err.message : 'Failed to process command.')
     } finally {
       setLoading(false)
     }

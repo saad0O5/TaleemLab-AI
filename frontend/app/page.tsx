@@ -1,27 +1,32 @@
 "use client"
 
+import dynamic from 'next/dynamic'
 import { useExperiment } from '../hooks/useExperiment'
+import { ExperimentProvider, useExperimentContext } from '../context/ExperimentContext'
+import { ToastProvider } from '../components/ui/Toast'
 import { WelcomeScreen } from '../components/screens/WelcomeScreen'
 import { SetupScreen } from '../components/screens/SetupScreen'
 import { LabScreen } from '../components/screens/LabScreen'
 import { ProgressScreen } from '../components/screens/ProgressScreen'
-import { EvaluationScreen } from '../components/screens/EvaluationScreen'
-import { CameraModal } from '../components/camera/CameraModal'
+import { View } from '../lib/types'
 
-const STEP_TO_VIEW = { 1: 'capture', 2: 'confirm', 3: 'simulate', 4: 'progress' } as const
+// Code-split: camera and evaluation aren't needed on first paint
+const EvaluationScreen = dynamic(() => import('../components/screens/EvaluationScreen').then(m => ({ default: m.EvaluationScreen })))
+const CameraModal = dynamic(() => import('../components/camera/CameraModal').then(m => ({ default: m.CameraModal })))
 
-export default function Page() {
-  const exp = useExperiment()
+const STEP_TO_VIEW: Record<number, View> = { 1: 'capture', 2: 'confirm', 3: 'simulate', 4: 'progress', 5: 'evaluation' }
 
-  const handleStepClick = (step: number) => {
-    const targetView = STEP_TO_VIEW[step as keyof typeof STEP_TO_VIEW]
+function AppContent() {
+  const exp = useExperimentContext()
+
+  const onStepClick = (step: number) => {
+    const targetView = STEP_TO_VIEW[step]
     if (!targetView) return
-    // Allow navigation to completed or current steps
-    const viewOrder = ['capture', 'confirm', 'simulate', 'progress']
+    const viewOrder: View[] = ['capture', 'confirm', 'simulate', 'progress']
     const currentIdx = viewOrder.indexOf(exp.view)
     const targetIdx = viewOrder.indexOf(targetView)
     if (targetIdx <= currentIdx || exp.circuit) {
-      exp.setView(targetView as any)
+      exp.setView(targetView)
     }
   }
 
@@ -43,7 +48,7 @@ export default function Page() {
         onFileChange={exp.handleFileChange}
         onCapture={exp.startCapture}
         onSelectExample={exp.selectExample}
-        onStepClick={handleStepClick}
+        onStepClick={onStepClick}
       />
       {exp.cameraOpen && (
         <CameraModal
@@ -66,7 +71,7 @@ export default function Page() {
       onAutoCompleteCircuit={exp.autoCompleteCircuit}
       onViewChange={exp.setView}
       onContinueToSimulate={exp.handleContinueToSimulate}
-      onStepClick={handleStepClick}
+      onStepClick={onStepClick}
     />
   }
 
@@ -76,7 +81,7 @@ export default function Page() {
       studentModel={exp.studentModel}
       buildStudentProfile={exp.buildStudentProfile}
       onViewChange={exp.setView}
-      onStepClick={handleStepClick}
+      onStepClick={onStepClick}
     />
   }
 
@@ -113,6 +118,18 @@ export default function Page() {
     onResetStudentModel={exp.handleResetStudentModel}
     onUndo={exp.undoPrediction}
     canUndo={exp.canUndo}
-    onStepClick={handleStepClick}
+    onStepClick={onStepClick}
   />
+}
+
+export default function Page() {
+  const exp = useExperiment()
+
+  return (
+    <ExperimentProvider value={exp}>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
+    </ExperimentProvider>
+  )
 }

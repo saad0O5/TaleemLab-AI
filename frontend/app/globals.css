@@ -499,7 +499,8 @@ button:active { transform: scale(0.98); }
 
 /* ─── Lab Bench Zone ─── */
 .lab-bench {
-  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-soft) 100%);
+  background:
+    linear-gradient(135deg, var(--surface) 0%, var(--surface-soft) 100%);
   border: 2px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 16px;
@@ -507,6 +508,20 @@ button:active { transform: scale(0.98); }
   position: relative;
   overflow: hidden;
 }
+/* Subtle grid background (engineering paper feel) */
+.lab-bench::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: 0;
+}
+.lab-bench > * { position: relative; z-index: 1; }
 .lab-bench::before {
   content: '';
   position: absolute;
@@ -515,6 +530,7 @@ button:active { transform: scale(0.98); }
   right: 0;
   height: 3px;
   background: linear-gradient(90deg, var(--primary), var(--teal));
+  z-index: 2;
 }
 .lab-bench-label {
   font-size: 10px;
@@ -531,38 +547,51 @@ button:active { transform: scale(0.98); }
 /* ─── Circuit Diagram ─── */
 .sim-diagram {
   background: transparent;
-  padding: 8px 4px;
+  padding: 4px;
   border-radius: var(--radius);
+  position: relative;
 }
 .sim-diagram svg { width: 100%; display: block; }
+
+/* Wires */
 .circuit-wire {
-  stroke: var(--foreground);
-  stroke-width: 2;
+  stroke: var(--muted);
+  stroke-width: 2.5;
   fill: none;
-  opacity: 0.45;
+  opacity: 0.6;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transition: stroke 0.3s, opacity 0.3s, stroke-width 0.3s;
 }
 .wire-dot {
-  fill: var(--foreground);
-  opacity: 0.45;
+  fill: var(--muted);
+  opacity: 0.5;
+  transition: fill 0.3s, opacity 0.3s;
 }
+
+/* Flowing state */
 .is-flowing .circuit-wire {
   animation: dash-flow var(--pulse-speed) linear infinite;
   stroke: var(--teal);
   stroke-width: 3;
-  stroke-dasharray: 10 7;
+  stroke-dasharray: 12 8;
   opacity: 1;
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--teal) 70%, transparent));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--teal) 60%, transparent));
 }
 .is-flowing .wire-dot {
   fill: var(--teal);
   opacity: 1;
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--teal) 70%, transparent));
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--teal) 50%, transparent));
 }
-.node { color: var(--primary); fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-.node text { stroke: none; fill: var(--muted); font: 700 10px var(--font-sans); }
-.node-bulb circle { fill: var(--surface); stroke: var(--teal); }
+
+/* Current flow particles */
+.flow-particle {
+  fill: var(--teal);
+  opacity: 0.9;
+  filter: drop-shadow(0 0 6px var(--teal));
+}
+
+/* Diagram caption */
 .diagram-caption {
   display: flex;
   align-items: center;
@@ -571,10 +600,11 @@ button:active { transform: scale(0.98); }
   font-size: 11px;
   font-weight: 600;
   margin-top: 8px;
+  padding: 0 4px;
 }
 .flow-key { width: 20px; border-top: 2px dashed var(--teal); }
 
-@keyframes dash-flow { to { stroke-dashoffset: -28px; } }
+@keyframes dash-flow { to { stroke-dashoffset: -32px; } }
 
 /* ─── Stats Grid ─── */
 .stats-grid {
@@ -593,11 +623,26 @@ button:active { transform: scale(0.98); }
   padding: 10px 12px;
   display: grid;
   gap: 2px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--stat-accent, var(--muted-light));
+  border-radius: 2px;
+  transition: background 0.3s;
 }
 .stat-card span { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-.stat-card strong { font: 800 20px var(--font-heading); font-variant-numeric: tabular-nums; color: var(--foreground); }
+.stat-card strong { font: 800 20px var(--font-heading); font-variant-numeric: tabular-nums; color: var(--foreground); transition: color 0.2s; }
 .stat-card small { color: var(--muted); font-size: 10px; }
 .stat-warning strong, .stat-warning small { color: var(--warning); }
+.stat-warning::before { background: var(--warning); }
 
 /* ─── Control Cards ─── */
 .control-card {
@@ -1928,6 +1973,392 @@ button:active { transform: scale(0.98); }
 }
 .empty-state .btn {
   margin-top: 8px;
+}
+
+/* ─── Enhanced Answer Buttons ─── */
+.answer-btn:nth-child(1):hover {
+  border-color: var(--success);
+  background: var(--success-light);
+}
+.answer-btn:nth-child(1):hover .answer-icon {
+  background: var(--success);
+  color: white;
+}
+.answer-btn:nth-child(2):hover {
+  border-color: var(--warning);
+  background: var(--warning-light);
+}
+.answer-btn:nth-child(2):hover .answer-icon {
+  background: var(--warning);
+  color: white;
+}
+.answer-btn:nth-child(3):hover {
+  border-color: var(--muted);
+  background: var(--surface-soft);
+}
+
+/* ─── Live Value Pulse ─── */
+@keyframes value-flash {
+  0% { color: var(--teal); transform: scale(1.05); }
+  100% { color: var(--foreground); transform: scale(1); }
+}
+.stat-card strong {
+  display: inline-block;
+}
+
+/* ─── Enhanced Switch Toggle ─── */
+.switch-toggle {
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+.switch-toggle.closed {
+  box-shadow: 0 0 8px color-mix(in srgb, var(--teal) 40%, transparent);
+}
+
+/* ─── Slider Track Enhancement ─── */
+.control-card input[type=range]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+}
+.control-card input[type=range]::-moz-range-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  border: none;
+}
+.control-card input[type=range]:focus {
+  outline: none;
+}
+.control-card input[type=range]:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+/* ─── Smooth Screen Transitions ─── */
+.sim-layout > section {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* ─── Focus Ring (Accessibility) ─── */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ─── Toast Notifications ─── */
+.toast-container {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  z-index: 100;
+  display: grid;
+  gap: 8px;
+  max-width: 340px;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+  cursor: pointer;
+  animation: toast-in 0.25s ease-out;
+  backdrop-filter: blur(8px);
+}
+.toast-success {
+  background: color-mix(in srgb, var(--success) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border));
+  color: var(--success);
+}
+.toast-error {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  color: var(--danger);
+}
+.toast-info {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  color: var(--primary);
+}
+.toast-discovery {
+  background: color-mix(in srgb, var(--teal) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--teal) 30%, var(--border));
+  color: var(--teal);
+}
+.toast-icon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+  background: currentColor;
+}
+.toast-success .toast-icon { background: var(--success); color: white; }
+.toast-error .toast-icon { background: var(--danger); color: white; }
+.toast-info .toast-icon { background: var(--primary); color: white; }
+.toast-discovery .toast-icon { background: var(--teal); color: white; }
+.toast-message { flex: 1; color: var(--foreground); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ─── Circuit Diagram Tooltip ─── */
+.circuit-tooltip {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 20;
+  min-width: 120px;
+  animation: fade-in 0.15s ease-out;
+}
+.circuit-tooltip .tt-type {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.circuit-tooltip .tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+}
+.circuit-tooltip .tt-label { color: var(--muted); }
+.circuit-tooltip .tt-value { font-weight: 700; color: var(--foreground); font-variant-numeric: tabular-nums; }
+
+/* ─── AI Ask Input ─── */
+.ai-ask-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.ai-ask-card label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 8px;
+}
+.ai-ask-row {
+  display: flex;
+  gap: 8px;
+}
+.ai-ask-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 13px;
+  outline: none;
+}
+.ai-ask-row input:focus { border-color: var(--teal); }
+.ai-ask-row button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--teal);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ai-ask-row button:hover { background: #0f766e; }
+.ai-ask-row button:disabled { opacity: 0.5; }
+.ai-ask-response {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--foreground);
+  border-left: 3px solid var(--teal);
+}
+
+/* ─── Recognition Progress ─── */
+.recognition-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 0;
+}
+.recognition-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 280px;
+}
+.recognition-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: color 0.3s;
+}
+.recognition-step.active { color: var(--primary); }
+.recognition-step.done { color: var(--success); }
+.recognition-step-icon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.recognition-step.active .recognition-step-icon {
+  background: var(--primary-light);
+  color: var(--primary);
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+.recognition-step.done .recognition-step-icon {
+  background: var(--success-light);
+  color: var(--success);
+}
+.recognition-step:not(.active):not(.done) .recognition-step-icon {
+  background: var(--surface-soft);
+  color: var(--muted-light);
+}
+
+/* ─── Capacitor Panel ─── */
+.capacitor-panel {
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, #ec4899 25%, var(--border));
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.capacitor-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #ec4899;
+  margin-bottom: 10px;
+}
+.capacitor-tau {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+.capacitor-charge-bar {
+  height: 6px;
+  background: var(--surface-soft);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.capacitor-charge-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ec4899, #f472b6);
+  border-radius: 3px;
+  transition: width 0.15s ease-out;
+}
+.capacitor-charge-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.capacitor-time-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--foreground);
+  margin-bottom: 10px;
+}
+.capacitor-time-label input[type="range"] {
+  width: 100%;
+  accent-color: #ec4899;
+}
+.capacitor-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.capacitor-values > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cap-val-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.cap-val-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+.capacitor-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ─── Clickable Follow-up ─── */
+.ai-follow-up-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  margin-top: 6px;
+}
+.ai-follow-up-clickable:hover {
+  background: var(--primary-light);
+}
+.ai-follow-up-hint {
+  font-size: 10px;
+  color: var(--primary);
+  font-weight: 700;
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 /* ─── Reduced Motion ─── */

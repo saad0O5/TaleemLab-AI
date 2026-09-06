@@ -123,6 +123,8 @@ export const MISCONCEPTIONS: MisconceptionDef[] = [
 // ─── Constants ───────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'taleemlab_srm'
+const SCHEMA_VERSION_KEY = 'taleemlab_srm_version'
+const SCHEMA_VERSION = 1
 const INITIAL_CONFIDENCE = 0.15
 const CONFIDENCE_BOOST = 0.12
 const CONFIDENCE_DECAY = 0.06
@@ -150,6 +152,16 @@ export function loadStudentModel(): StudentModel {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return emptyModel()
+
+    // Check schema version
+    const storedVersion = localStorage.getItem(SCHEMA_VERSION_KEY)
+    if (storedVersion && Number(storedVersion) !== SCHEMA_VERSION) {
+      console.warn(`SRM schema mismatch: stored=${storedVersion}, current=${SCHEMA_VERSION}. Resetting model.`)
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.setItem(SCHEMA_VERSION_KEY, String(SCHEMA_VERSION))
+      return emptyModel()
+    }
+
     const parsed = JSON.parse(raw)
     // Validate schema conformance
     if (!parsed || typeof parsed !== 'object') return emptyModel()
@@ -170,6 +182,7 @@ export function loadStudentModel(): StudentModel {
 
 export function saveStudentModel(model: StudentModel): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(model))
+  localStorage.setItem(SCHEMA_VERSION_KEY, String(SCHEMA_VERSION))
   // Sync to Supabase in background (non-blocking)
   syncToSupabase(model).catch(() => {})
 }

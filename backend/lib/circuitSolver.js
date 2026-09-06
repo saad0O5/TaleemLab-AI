@@ -142,6 +142,16 @@ function solveCircuit(circuit) {
     c => c.type === "resistor" || c.type === "bulb"
   );
 
+  // Capacitors in the circuit
+  const capacitors = components.filter(c => c.type === "capacitor");
+  const totalCapacitance = capacitors.length > 0
+    ? capacitors.reduce((sum, c) => sum + (c.capacitance || 100), 0)
+    : 0;
+
+  // Diodes in the circuit (one-way current, ~0.7V drop each)
+  const diodes = components.filter(c => c.type === "diode");
+  const DIODE_FORWARD_DROP = 0.7;
+
   let totalResistance = 0;
   // Per-group equivalent resistance, kept separately (not just summed into one
   // number) so we can later compute how much of the total voltage each parallel
@@ -194,12 +204,16 @@ function solveCircuit(circuit) {
 
   let effectiveResistance = totalResistance;
 
+  // Account for diode forward voltage drop
+  const diodeDrop = diodes.length * DIODE_FORWARD_DROP;
+  const effectiveVoltage = Math.max(0, voltage - diodeDrop);
+
   if (totalResistance <= NEAR_ZERO_THRESHOLD) {
     effectiveResistance = EPSILON_RESISTANCE;
     flags.push("ideal_zero_resistance");
   }
 
-  const rawCurrent = voltage / effectiveResistance;
+  const rawCurrent = effectiveVoltage / effectiveResistance;
   const displayCapped = rawCurrent > DISPLAY_CURRENT_CAP;
   if (displayCapped) {
     flags.push("current_capped_for_display");
@@ -255,6 +269,30 @@ function solveCircuit(circuit) {
       continue;
     }
 
+    if (c.type === "capacitor") {
+      const capacitance = c.capacitance || 100;
+      const tau = totalResistance > 0 ? (totalResistance * capacitance * 1e-6) : 0.001;
+      componentStates[c.id] = {
+        id: c.id, type: c.type,
+        current: round(totalCurrent),
+        voltage: round(effectiveVoltage),
+        brightness: null,
+        chargeLevel: 1, tau: round(tau, 4),
+      };
+      continue;
+    }
+
+    if (c.type === "diode") {
+      const forwardBiased = effectiveVoltage > 0;
+      componentStates[c.id] = {
+        id: c.id, type: c.type,
+        current: forwardBiased ? round(totalCurrent) : 0,
+        voltage: forwardBiased ? round(DIODE_FORWARD_DROP) : round(effectiveVoltage),
+        brightness: null,
+      };
+      continue;
+    }
+
     // voltmeter resolved in pass 2, once every other component's voltage is known
   }
 
@@ -276,9 +314,10 @@ function solveCircuit(circuit) {
 
   return {
     current: round(displayCapped ? DISPLAY_CURRENT_CAP : totalCurrent),
-    rawCurrent: round(totalCurrent), // uncapped, for internal use if ever needed
+    rawCurrent: round(totalCurrent),
     voltage,
     totalResistance: round(totalResistance),
+    totalCapacitance: totalCapacitance > 0 ? round(totalCapacitance) : null,
     componentStates: components.map(c => componentStates[c.id]),
     flags,
     note: null

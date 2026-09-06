@@ -1,9 +1,10 @@
 export interface CircuitComponent {
   id: string;
-  type: "battery" | "resistor" | "switch" | "bulb" | "ammeter" | "voltmeter";
+  type: "battery" | "resistor" | "switch" | "bulb" | "ammeter" | "voltmeter" | "capacitor" | "diode";
   voltage?: number;
   polarity?: "same" | "reversed";
   resistance?: number;
+  capacitance?: number; // microfarads
   state?: "open" | "closed";
   connects_to: string[];
 }
@@ -45,6 +46,7 @@ export interface SolverResult {
   rawCurrent: number;
   voltage: number;
   totalResistance: number | null;
+  totalCapacitance?: number | null; // microfarads
   componentStates: ComponentState[];
   flags: SolverFlag[];
   note: string | null;

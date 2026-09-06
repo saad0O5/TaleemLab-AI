@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { TopBar } from '../ui/TopBar'
 import { Icon } from '../icons/Icon'
 import { ExampleKey, curatedExamples, exampleLabels } from '../../lib/exampleCircuits'
@@ -18,6 +19,8 @@ const SYMBOLS = [
   { name: 'Resistor', example: 'e.g. 470\u03A9', glyph: <><path d="M2 12h3l2-4 2.5 8 2.5-8 2 4h3" /><line x1="2" y1="12" x2="0" y2="12"/><line x1="14" y1="12" x2="16" y2="12"/></> },
   { name: 'Switch', example: 'open or closed', glyph: <><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><line x1="0" y1="12" x2="2.5" y2="12"/><line x1="12" y1="12" x2="16" y2="12"/><line x1="4" y1="12" x2="10" y2="6"/></> },
   { name: 'Bulb', example: 'e.g. 30\u03A9', glyph: <><circle cx="8" cy="10" r="5"/><line x1="5.5" y1="7.5" x2="10.5" y2="12.5"/><line x1="10.5" y1="7.5" x2="5.5" y2="12.5"/><line x1="6" y1="15" x2="10" y2="15"/><line x1="8" y1="15" x2="8" y2="18"/></> },
+  { name: 'Capacitor', example: 'e.g. 100\u03BCF', glyph: <><line x1="0" y1="12" x2="6" y2="12"/><line x1="6" y1="6" x2="6" y2="18" strokeWidth="2"/><line x1="10" y1="6" x2="10" y2="18" strokeWidth="2"/><line x1="10" y1="12" x2="16" y2="12"/></> },
+  { name: 'Diode', example: '0.7V drop', glyph: <><line x1="0" y1="12" x2="5" y2="12"/><polygon points="5,7 5,17 12,12" fill="currentColor" stroke="none"/><line x1="12" y1="7" x2="12" y2="17" strokeWidth="2"/><line x1="12" y1="12" x2="16" y2="12"/></> },
 ]
 
 export function WelcomeScreen({ error, loading, fileInputRef, onFileChange, onCapture, onSelectExample, onStepClick }: WelcomeScreenProps) {
@@ -103,13 +106,8 @@ export function WelcomeScreen({ error, loading, fileInputRef, onFileChange, onCa
           Upload from gallery
         </button>
 
-        {/* Loading */}
-        {loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '20px 0' }}>
-            <div style={{ width: '36px', height: '36px', border: '3px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: '600' }}>Analyzing your diagram...</span>
-          </div>
-        )}
+        {/* Loading with step-by-step progress */}
+        {loading && <RecognitionProgress />}
 
         {/* Sample Experiments */}
         <div>
@@ -156,6 +154,46 @@ function DevExamples({ onSelectExample, loading }: { onSelectExample: (key: Exam
           </select>
         </div>
       </details>
+    </div>
+  )
+}
+
+/**
+ * Animated step-by-step progress shown while recognizing a circuit.
+ * Steps advance automatically to give the user a sense of what's happening.
+ */
+function RecognitionProgress() {
+  const [currentStep, setCurrentStep] = useState(0)
+  const steps = [
+    { label: 'Compressing image', icon: '•' },
+    { label: 'Sending to AI vision model', icon: '•' },
+    { label: 'Identifying components', icon: '•' },
+    { label: 'Building circuit model', icon: '•' },
+  ]
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1))
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [steps.length])
+
+  return (
+    <div className="recognition-progress">
+      <div className="recognition-steps">
+        {steps.map((step, i) => (
+          <div
+            key={i}
+            className={`recognition-step ${i < currentStep ? 'done' : i === currentStep ? 'active' : ''}`}
+          >
+            <span className="recognition-step-icon">
+              {i < currentStep ? '✓' : step.icon}
+            </span>
+            <span>{step.label}</span>
+          </div>
+        ))}
+      </div>
+      <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: '600' }}>This may take a few seconds...</span>
     </div>
   )
 }

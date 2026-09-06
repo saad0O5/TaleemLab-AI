@@ -4,9 +4,10 @@ import { Icon } from '../icons/Icon'
 interface AITutorCardProps {
   explanation: Explanation | null
   aiThinking: boolean
+  onFollowUpClick?: (question: string) => void
 }
 
-export function AITutorCard({ explanation, aiThinking }: AITutorCardProps) {
+export function AITutorCard({ explanation, aiThinking, onFollowUpClick }: AITutorCardProps) {
   // State 1: Empty — no prediction made yet
   if (!explanation && !aiThinking) {
     return (
@@ -53,9 +54,14 @@ export function AITutorCard({ explanation, aiThinking }: AITutorCardProps) {
         <p className="ai-explanation">{explanation.text}</p>
 
         {explanation.followUp && (
-          <div className="ai-follow-up">
+          <div
+            className={`ai-follow-up ${onFollowUpClick ? 'ai-follow-up-clickable' : ''}`}
+            onClick={onFollowUpClick ? () => onFollowUpClick(explanation.followUp!) : undefined}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
             <Icon type="target" size={12} />
-            <span>{explanation.followUp}</span>
+            <span style={{ flex: 1 }}>{explanation.followUp}</span>
+            {onFollowUpClick && <span className="ai-follow-up-hint">Ask AI</span>}
           </div>
         )}
 
