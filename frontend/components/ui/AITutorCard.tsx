@@ -53,7 +53,17 @@ export function AITutorCard({ explanation, aiThinking, onFollowUpClick }: AITuto
 
       <div className="ai-response-content">
         <div className="ai-headline">{isCorrect ? 'You got it!' : 'Not quite'}</div>
-        {isAI && <span className="ai-badge">AI Tutor</span>}
+        {isAI ? (
+          <span className="ai-badge">AI Tutor</span>
+        ) : (
+          <span
+            className="ai-badge"
+            style={{ background: 'var(--surface-soft)', color: 'var(--muted)', border: '1px solid var(--border)' }}
+            title="Live AI is unavailable — showing built-in rule-based guidance"
+          >
+            AI offline · built-in guidance
+          </span>
+        )}
 
         <h2>What happened?</h2>
         <p className="ai-explanation">{explanation.text}</p>

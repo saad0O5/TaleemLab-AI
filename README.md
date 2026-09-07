@@ -66,6 +66,9 @@ Draw on paper → Photograph → AI reads components & values → Simulate live
 └───────────────────────────────────────────────────────────┘
 ```
 
+> **Two solvers, by design (not an accident).** The client-side TypeScript solver (`frontend/lib/circuitSolver.ts`) is **authoritative for everything in the UI** — it gives instant, offline feedback with zero network latency. The Node solver (`backend/lib/circuitSolver.js`) mirrors it on the server to validate the vision pipeline's output and to serve any non-browser API client. They are kept behaviourally in sync, and `npm test` includes a recognition type-parity guard against drift.
+
+
 ## Tech stack
 
 - **Frontend:** Next.js 16 (App Router), TypeScript, React Context, hand-built SVG circuit renderer with animated current flow.

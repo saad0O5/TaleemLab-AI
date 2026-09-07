@@ -214,10 +214,10 @@ export function useExperiment() {
     fileInputRef.current?.click()
   }
 
-  const updateComponentValue = async (componentId: string, field: string, value: any) => {
+  const updateComponentValue = async (componentId: string, field: string, value: number | string) => {
     if (!circuit) return
     const updatedComponents = circuit.components.map(c => {
-      if (c.id === componentId) return { ...c, [field]: value }
+      if (c.id === componentId) return { ...c, [field]: value } as CircuitComponent
       return c
     })
     const updatedCircuit = { ...circuit, components: updatedComponents }
@@ -229,8 +229,8 @@ export function useExperiment() {
       setCircuit(updatedCircuit)
       setSolverResult(res)
 
-      if (field === 'voltage') setVoltage(value)
-      if (field === 'resistance') setResistance(value)
+      if (field === 'voltage') setVoltage(value as number)
+      if (field === 'resistance') setResistance(value as number)
       if (field === 'state') setClosed(value === 'closed')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to update component.')
@@ -329,7 +329,7 @@ export function useExperiment() {
   const brightness = Math.round((solverResult?.componentStates?.find((state) => state.type === 'bulb')?.brightness ?? 0) * 100)
   const capped = hasFlag(solverResult?.flags, 'current_capped_for_display')
 
-  const change = async (key: PredictionKey, next: any, direction: 'up' | 'down', answer: 'up' | 'down' | 'same') => {
+  const change = async (key: PredictionKey, next: number | string, direction: 'up' | 'down', answer: 'up' | 'down' | 'same') => {
     if (!circuit) return
 
     // Save snapshot for undo
@@ -365,7 +365,7 @@ export function useExperiment() {
       const res = await applyChange(circuit, component.id, field, next)
 
       const updatedComponents = circuit.components.map(c => {
-        if (c.id === component!.id) return { ...c, [field]: next }
+        if (c.id === component!.id) return { ...c, [field]: next } as CircuitComponent
         return c
       })
       const updatedCircuit = { ...circuit, components: updatedComponents }

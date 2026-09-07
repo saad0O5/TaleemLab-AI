@@ -298,7 +298,7 @@ export async function loadFromSupabase(): Promise<StudentModel | null> {
         answer: row.answer as 'up' | 'down' | 'same',
         correct: row.correct,
         circuitContext: {
-          topology: row.circuit_topology as any,
+          topology: row.circuit_topology as 'series' | 'series_parallel',
           hasParallelGroups: row.circuit_has_parallel,
           hasSwitch: row.circuit_has_switch,
           componentCount: row.circuit_component_count,
