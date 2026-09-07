@@ -34,3 +34,5 @@ Thumbs.db
 
 # vercel build cache
 .vercel/
+.vercel
+.env*
