@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react'
 import { View } from '../../lib/types'
 import { getEvaluation, StudentProfileForAI, AIEvaluation } from '../../lib/api'
 import { Icon } from '../icons/Icon'
+import { TopBar } from '../ui/TopBar'
 
 interface EvaluationScreenProps {
   studentProfile: StudentProfileForAI
   onViewChange: (view: View) => void
+  onStepClick?: (step: number) => void
 }
 
-export function EvaluationScreen({ studentProfile, onViewChange }: EvaluationScreenProps) {
+export function EvaluationScreen({ studentProfile, onViewChange, onStepClick }: EvaluationScreenProps) {
   const [evaluation, setEvaluation] = useState<AIEvaluation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -44,7 +46,7 @@ export function EvaluationScreen({ studentProfile, onViewChange }: EvaluationScr
     switch (level) {
       case 'strong': return 'var(--success)'
       case 'developing': return 'var(--primary)'
-      case 'needs_work': return 'var(--warning, #f59e0b)'
+      case 'needs_work': return 'var(--warning)'
       default: return 'var(--muted)'
     }
   }
@@ -60,6 +62,7 @@ export function EvaluationScreen({ studentProfile, onViewChange }: EvaluationScr
 
   return (
     <main className="page-shell">
+      <TopBar step={5} onStepClick={onStepClick} currentView="evaluation" />
       <div className="evaluation-layout">
         {/* Back link */}
         <button className="btn-text" onClick={() => onViewChange('progress')}>

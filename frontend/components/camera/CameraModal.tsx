@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { Icon } from '../icons/Icon'
+
 
 interface CameraModalProps {
   onCapture: (imageBase64: string) => void
@@ -11,6 +13,7 @@ const MAX_DIMENSION = 1920
 export function CameraModal({ onCapture, onClose, onFallback }: CameraModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'starting' | 'ready' | 'error'>('starting')
   const [showSymbols, setShowSymbols] = useState(false)
 
@@ -52,6 +55,32 @@ export function CameraModal({ onCapture, onClose, onFallback }: CameraModalProps
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onClose])
 
+  // Focus management: move focus into the dialog and trap Tab navigation.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    const getFocusable = () => Array.from(
+      el.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter((n) => !n.hasAttribute('disabled'))
+    const timer = window.setTimeout(() => { getFocusable()[0]?.focus() }, 0)
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const items = getFocusable()
+      if (items.length === 0) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+    el.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.clearTimeout(timer)
+      el.removeEventListener('keydown', onKeyDown)
+      previouslyFocused?.focus?.()
+    }
+  }, [])
+
   const takePhoto = () => {
     const video = videoRef.current
     if (!video || video.videoWidth === 0) return
@@ -66,70 +95,72 @@ export function CameraModal({ onCapture, onClose, onFallback }: CameraModalProps
   }
 
   return <div
-    style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'grid', placeItems: 'center', padding: '20px', zIndex: 50 }}
+    className="cam-modal-overlay"
     onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
   >
-    <div style={{ width: '100%', maxWidth: '520px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '18px', display: 'grid', gap: '14px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <strong style={{ fontSize: '15px' }}>Take a photo of your circuit</strong>
+    <div ref={containerRef} role="dialog" aria-modal="true" aria-label="Take a photo of your circuit" tabIndex={-1} className="cam-modal-card">
+      <div className="cam-modal-head">
+        <strong className="cam-modal-title">Take a photo of your circuit</strong>
         <button
           onClick={onClose}
           aria-label="Close camera"
-          style={{ border: 0, background: 'none', color: 'var(--muted)', fontSize: '18px', fontWeight: '800', lineHeight: 1 }}
-        >✕</button>
+          className="cam-close-btn"
+        ><Icon type="x" size={18} /></button>
       </div>
 
       {status === 'error' ? (
         <>
-          <p style={{ margin: 0, color: 'var(--muted)', fontSize: '13px', lineHeight: 1.5 }}>
+          <p className="cam-error-text">
             The camera couldn't be started — it may be unavailable, in use, or permission was denied.
             You can upload a photo instead.
           </p>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="blue-button" style={{ height: '44px', flex: 1, fontSize: '13px' }} onClick={onFallback}>📁 Upload a photo instead</button>
-            <button className="literal-switch" style={{ height: '44px', flex: 1, fontSize: '13px', background: 'var(--surface-soft)', color: 'var(--foreground)', border: '1px solid var(--border)' }} onClick={onClose}>Close</button>
+          <div className="cam-actions">
+            <button className="blue-button cam-btn-flex" onClick={onFallback}><Icon type="upload" size={14} /> Upload a photo instead</button>
+            <button className="literal-switch cam-btn-flex cam-btn-ghost" onClick={onClose}>Close</button>
           </div>
         </>
       ) : (
         <>
-          <div style={{ position: 'relative', background: '#000', borderRadius: '4px', overflow: 'hidden' }}>
-            <video ref={videoRef} playsInline muted style={{ width: '100%', display: 'block' }} />
+          <div className="cam-video-wrap">
+            <video ref={videoRef} playsInline muted className="cam-video" />
             {status === 'starting' && (
-              <p style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', margin: 0, color: '#fff', fontSize: '13px', minHeight: '180px' }}>Starting camera…</p>
+              <p className="cam-video-starting">Starting camera…</p>
             )}
           </div>
           {/* Compact symbol reference */}
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+          <div className="cam-symbol-section">
             <button
               onClick={() => setShowSymbols(!showSymbols)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 0, background: 'none', cursor: 'pointer', padding: '4px 0', color: 'var(--foreground)' }}
+              className="cam-symbol-toggle"
+              aria-expanded={showSymbols}
             >
-              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--muted)', letterSpacing: '0.5px' }}>SYMBOL REFERENCE</span>
-              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{showSymbols ? '▾' : '▸'}</span>
+              <span className="cam-symbol-eyebrow">SYMBOL REFERENCE</span>
+              <span className="cam-symbol-chevron"><Icon type={showSymbols ? 'chevron-up' : 'chevron-down'} size={14} /></span>
             </button>
             {showSymbols && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '8px' }}>
+              <div className="cam-symbol-grid">
                 {[
                   { name: 'Battery', glyph: <><line x1="8" y1="4" x2="8" y2="20" strokeWidth="2.5"/><line x1="16" y1="7" x2="16" y2="17" strokeWidth="1.5"/></> },
                   { name: 'Resistor', glyph: <path d="M2 12h3l2-4 2.5 8 2.5-8 2 4h3" /> },
                   { name: 'Switch', glyph: <><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><line x1="4" y1="12" x2="10" y2="6"/></> },
                   { name: 'Bulb', glyph: <><circle cx="8" cy="10" r="5"/><line x1="5.5" y1="7.5" x2="10.5" y2="12.5"/><line x1="10.5" y1="7.5" x2="5.5" y2="12.5"/></> },
+                  { name: 'Capacitor', glyph: <><line x1="0" y1="12" x2="6" y2="12"/><line x1="6" y1="6" x2="6" y2="18" strokeWidth="2"/><line x1="10" y1="6" x2="10" y2="18" strokeWidth="2"/><line x1="10" y1="12" x2="16" y2="12"/></> },
+                  { name: 'Diode', glyph: <><line x1="0" y1="12" x2="5" y2="12"/><polygon points="5,7 5,17 12,12" fill="currentColor" stroke="none"/><line x1="12" y1="7" x2="12" y2="17" strokeWidth="2"/><line x1="12" y1="12" x2="16" y2="12"/></> },
                 ].map(({ name, glyph }) => (
-                  <div key={name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', background: 'var(--surface-soft)', borderRadius: '3px' }}>
-                    <svg width="28" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{glyph}</svg>
-                    <span style={{ fontSize: '11px', fontWeight: '600' }}>{name}</span>
+                  <div key={name} className="cam-symbol-item">
+                    <svg className="cam-symbol-glyph" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{glyph}</svg>
+                    <span className="cam-symbol-name">{name}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
           <button
-            className="blue-button"
-            style={{ height: '48px', fontSize: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+            className="blue-button cam-btn-photo"
             onClick={takePhoto}
             disabled={status !== 'ready'}
           >
-            📷 Take photo
+            <Icon type="camera" size={16} /> Take photo
           </button>
         </>
       )}

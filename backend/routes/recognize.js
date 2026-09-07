@@ -38,7 +38,7 @@ async function handleRecognize(req, res, { parseRequestBody, sendJSON }) {
     // Validate schema before passing to solver
     const data = parsedResult.data;
     const validTopologies = ["series", "series_parallel"];
-    const validTypes = ["battery", "resistor", "switch", "bulb", "ammeter", "voltmeter"];
+    const validTypes = ["battery", "resistor", "switch", "bulb", "ammeter", "voltmeter", "capacitor", "diode"];
 
     if (!data.topology || !validTopologies.includes(data.topology)) {
       return sendJSON(res, 422, {

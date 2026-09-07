@@ -32,6 +32,9 @@ export function WelcomeScreen({ error, loading, fileInputRef, onFileChange, onCa
         <p className="eyebrow">Get Started</p>
         <h1>Start an <span>experiment</span></h1>
         <p>Draw a circuit on paper, then take a photo. The app will turn it into a live simulation you can experiment with.</p>
+        <p className="ai-powered-note">
+          <Icon type="sparkles" size={12} /> AI reads your drawing and a live tutor explains each result
+        </p>
       </div>
 
       <div className="page-body">
@@ -81,7 +84,7 @@ export function WelcomeScreen({ error, loading, fileInputRef, onFileChange, onCa
           <ul className="tips-list">
             <li>Draw components in a <strong>complete loop</strong> with connecting wires</li>
             <li>Label each component with its value (e.g. <strong>9V</strong>, <strong>470{'\u03A9'}</strong>)</li>
-            <li>Use standard symbols -- the shapes shown above</li>
+            <li>Use standard symbols — the shapes shown above</li>
             <li>Good lighting, flat photo angle helps the AI read your drawing</li>
           </ul>
         </div>
@@ -98,7 +101,7 @@ export function WelcomeScreen({ error, loading, fileInputRef, onFileChange, onCa
         {/* Action Buttons */}
         <button className="btn btn-success" onClick={onCapture} disabled={loading}>
           <Icon type="camera" size={18} />
-          {loading ? 'Analyzing...' : 'Take a photo'}
+          {loading ? 'Analyzing…' : 'Take a photo'}
         </button>
 
         <button className="btn btn-outline" onClick={() => fileInputRef.current?.click()} disabled={loading}>
@@ -112,7 +115,7 @@ export function WelcomeScreen({ error, loading, fileInputRef, onFileChange, onCa
         {/* Sample Experiments */}
         <div>
           <div className="section-label">Or try a sample experiment</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div className="welcome-samples">
             {curatedExamples.map(({ key, name, description }) => (
               <button
                 key={key}
@@ -149,7 +152,7 @@ function DevExamples({ onSelectExample, loading }: { onSelectExample: (key: Exam
             onChange={(e) => { if (e.target.value) { onSelectExample(e.target.value as ExampleKey); e.target.value = '' } }}
             disabled={loading}
           >
-            <option value="" disabled>Choose a test case...</option>
+            <option value="" disabled>Choose a test case…</option>
             {Object.entries(exampleLabels).map(([key, label]) => <option key={key} value={key}>{label as string}</option>)}
           </select>
         </div>
@@ -193,7 +196,7 @@ function RecognitionProgress() {
           </div>
         ))}
       </div>
-      <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: '600' }}>This may take a few seconds...</span>
+      <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: '600' }}>This may take a few seconds…</span>
     </div>
   )
 }

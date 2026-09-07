@@ -1,112 +1,121 @@
 # TaleemLab — AI Virtual Physics Lab
 
-**Draw a circuit on paper. Take a photo. Watch it come alive.**
+> **Draw a circuit on paper. Take a photo. Watch it come alive — and learn by predicting what happens next.**
 
-TaleemLab transforms hand-drawn DC circuit diagrams into interactive simulations using AI vision. Built for students in schools without physics labs — all you need is a smartphone and paper.
+An AI-powered virtual physics lab for students who have no working lab, no expensive equipment — just a notebook, a pencil, and a phone. Photograph a hand-drawn DC circuit, and TaleemLab reads it, simulates it in real time, and tutors the student through it.
+
+**Built for the Alibaba Cloud AI Hackathon Pakistan 2026 (Bano Qabil × Alkhidmat) — *AI for Pakistan's Future*.** Track: **Education**.
 
 ---
 
-## The Problem
+## Why it matters (Problem & Impact)
 
-Over 80% of public schools in developing regions lack functional physics labs. Students memorize Ohm's Law from textbooks but never build intuition through experimentation. Without hands-on labs, misconceptions about voltage, current, and resistance go undiagnosed and uncorrected.
+A large share of public schools in Pakistan have no functional physics lab. Students memorise Ohm's Law from a textbook but never *feel* why turning a knob changes the bulb. The misconceptions — "current gets used up by the first resistor", "a bigger battery pushes more current no matter what" — go **undiagnosed and uncorrected**, because a human teacher with 50 students cannot spot each wrong mental model.
 
-## The Solution
+TaleemLab turns any notebook sketch into an interactive lab and, crucially, **diagnoses and corrects the reasoning**, not just the answer. This is directly usable in a Grade 9–10 classroom with a single shared phone.
 
-TaleemLab bridges this gap with an AI-powered virtual lab that:
+## What it does (the flow)
 
-1. **Reads hand-drawn circuits** — photograph a notebook sketch, and Gemini Vision extracts every component, value, and connection
-2. **Simulates in real time** — a deterministic physics engine solves the circuit instantly
-3. **Teaches through prediction** — before every change, students predict the outcome, building conceptual understanding
-4. **Adapts to the learner** — a Student Reasoning Model (SRM) tracks misconceptions with Bayesian confidence scoring and delivers targeted explanations
-5. **Evaluates progress** — AI-generated assessments identify strengths, weaknesses, and next steps
+```
+Draw on paper → Photograph → AI reads components & values → Simulate live
+     → Predict first → Change one variable → AI tutor explains *why* → Adapt
+```
 
-## Key Features
+1. **Reads hand-drawn circuits** — a vision model extracts every component, value, connection, *and* the likely topic the student is exploring.
+2. **Simulates instantly** — a deterministic physics engine (not a guess) solves the circuit the moment you touch it.
+3. **Teaches predict-first** — before any change, the student commits to a prediction. This is the core pedagogy, not decoration.
+4. **Adapts to the learner** — a Student Reasoning Model tracks misconceptions with Bayesian confidence and picks the next thing to investigate.
+5. **Evaluates understanding** — an AI-generated assessment of strengths, weak concepts, and next steps.
 
-| Feature | Description |
-|---------|-------------|
-| Vision Recognition | Gemini Vision extracts circuit topology, components (including capacitors & diodes), and values from photos |
-| Predict-First Learning | Students guess outcomes before seeing results — proven to improve retention |
-| AI Tutor (Socratic) | Guides with questions, not just answers — adapts to misconception history and confidence level |
-| Ask the AI Anything | Type any question about your circuit — AI answers using actual live values |
-| Student Reasoning Model | Bayesian tracking of 6 known physics misconceptions with evidence-based confidence decay |
-| Client-Side Solver | TypeScript physics engine runs locally — instant feedback, supports series, parallel, RC, and diode circuits |
-| RC Time Visualization | Interactive charge/discharge slider when a capacitor is present — teaches τ = RC |
-| Interactive Diagram | Hover any component to see live voltage, current, and brightness values |
-| Discovery Milestones | Gamified achievements for building conceptual understanding |
-| Sound & Toast Feedback | Audio cues and non-blocking notifications for predictions, toggles, and discoveries |
+## What makes it a real system, not a ChatGPT wrapper (Innovation & Technical Depth)
 
-## Architecture
+| | |
+|---|---|
+| **Student Reasoning Model (SRM)** | A confidence-updating model over six known physics misconceptions. Each misconception has a hand-authored detection signature; wrong predictions *raise* its confidence and correct ones *decay* it (Bayesian update with diminishing returns). It keeps an evidence memory and computes an **investigation priority** (`score = 0.4·maxConfidence + 0.4·(1−accuracy) + 0.2·novelty`) to decide what to probe next. |
+| **Deterministic solver, run client-side** | Series, series-parallel (per-group voltage division), capacitors (τ = RC), diodes (0.7 V drop), bulbs (brightness), ammeters/voltmeters. Sanity limits, short-circuit handling, current capping, and graceful degradation on impossible inputs. Zero network latency — feedback is instant. |
+| **Socratic AI tutor** | Guides with questions, referencing the student's own misconception history and the **live** circuit values. |
+| **Ask-the-AI-anything** | Free-text questions answered against actual current values, not generic textbook text. |
+| **Local-first architecture** | Only 5 endpoints touch the network (recognition + 4 AI calls). Solve, apply-change and text-command run entirely in the browser. |
+| **Nothing hard-crashes** | Every AI route has a deterministic rule-based fallback. If the network is down, the lab still works. |
+
+## How it works
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                    Frontend (Next.js 16)                  │
-│                                                          │
-│  Welcome → Setup → Lab Bench → Progress → Evaluation     │
-│                                                          │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐  │
-│  │ Client-side  │  │  Student     │  │  Experiment    │  │
-│  │ Circuit      │  │  Reasoning   │  │  Context       │  │
-│  │ Solver (TS)  │  │  Model       │  │  (state mgmt)  │  │
-│  └─────────────┘  └──────────────┘  └────────────────┘  │
+│                 Frontend (Next.js 16 + TS)                │
+│  Welcome → Confirm → Lab Bench → Progress → Evaluation    │
+│  ┌────────────┐ ┌────────────┐ ┌───────────────────────┐  │
+│  │ Client-side│ │  Student   │ │  Experiment state +   │  │
+│  │ solver(TS) │ │  Reasoning │ │  engagement / SRM     │  │
+│  │  (instant) │ │  Model     │ │  (React Context)      │  │
+│  └────────────┘ └────────────┘ └───────────────────────┘  │
 └──────────────────────────┬───────────────────────────────┘
-                           │ REST API (Bearer token auth)
+                           │  REST (only recognition + AI)
 ┌──────────────────────────▼───────────────────────────────┐
-│               Backend (Vercel Serverless)                  │
-│                                                          │
-│  /api/recognize-circuit  →  Gemini Vision (image → JSON) │
-│  /api/solve              →  Circuit solver (server-side) │
-│  /api/apply-change       →  Change + re-solve            │
-│  /api/text-command       →  NL command parser            │
-│  /api/explain-prediction →  AI Tutor (Socratic + Gemini) │
-│  /api/ask-ai             →  Ask any question (contextual) │
-│  /api/learning-summary   →  Session summary (AI)         │
-│  /api/evaluate-student   →  AI evaluation of progress    │
-│  /api/health             →  Health check                  │
-│                                                          │
-│  All AI routes have rule-based fallbacks when Gemini      │
-│  is unavailable (rate-limited, timeout, quota).           │
-└──────────────────────────────────────────────────────────┘
+│              Backend (Node.js — standalone)               │
+│  POST /api/recognize-circuit   → vision: image → JSON     │
+│  POST /api/explain-prediction  → Socratic tutor           │
+│  POST /api/learning-summary    → session recap            │
+│  POST /api/evaluate-student    → AI assessment            │
+│  POST /api/ask-ai              → contextual Q&A           │
+│  POST /api/solve-circuit · apply-change · text-command    │
+│         (also exposed server-side; the client uses local) │
+│  GET  /api/health                                         │
+│  CORS allowlist · opt-in bearer auth · rate limit ·       │
+│  10 MB payload cap · rule-based fallbacks on every AI call│
+└───────────────────────────────────────────────────────────┘
 ```
 
-## Tech Stack
+## Tech stack
 
-- **Frontend**: Next.js 16, TypeScript, Tailwind CSS 4, React Context API
-- **Backend**: Node.js on Vercel serverless functions, modular route architecture
-- **AI**: Google Gemini 2.0 Flash (vision + text), with fallback to Gemini 1.5 Flash
-- **Physics**: Custom deterministic DC circuit solver (series + series-parallel, capacitors with RC time constants, diodes with forward voltage drop)
-- **Pedagogy**: Student Reasoning Model with Bayesian misconception tracking, evidence memory, and adaptive investigation selection
+- **Frontend:** Next.js 16 (App Router), TypeScript, React Context, hand-built SVG circuit renderer with animated current flow.
+- **Backend:** Node.js HTTP server (standalone; also deployable to Vercel serverless via `vercel.json` + `api/index.js`), modular routes.
+- **AI:** Google Gemini (vision + text), configured via `GEMINI_MODEL` (default `gemini-3.6-flash`, automatic fallbacks). Behind a single `callGemini()` seam.
+- **Physics & pedagogy:** custom deterministic DC solver + Bayesian Student Reasoning Model.
+- **Persistence:** `localStorage` by default; optional Supabase sync (off unless configured).
 
-## Running Locally
+> **On the AI provider.** TaleemLab uses Google Gemini because, as student builders, we did not have budget for a paid cloud model subscription at build time. The provider is isolated behind one function (`backend/lib/gemini.js`), so it can be pointed at a Qwen / DashScope vision model with a small change and no architectural rework. For the live demo we use a fresh API key (the build-time key's free quota was exhausted). We built the project with **Qoder**, Alibaba's agentic AI coding IDE, funded by the hackathon credits — that is our Alibaba Cloud touchpoint.
 
-### Backend
+## Run it locally
+
+**1. Backend** (port 4000)
 ```bash
 cd backend
-cp .env.example .env   # add GEMINI_API_KEY
+cp .env.example .env       # put your GEMINI_API_KEY in .env
 npm install
-node server.js          # starts on port 4000
+npm run dev                # or: node server.js
 ```
 
-### Frontend
+**2. Frontend** (port 3000)
 ```bash
 cd frontend
-cp .env.local.example .env.local  # set NEXT_PUBLIC_API_URL=http://localhost:4000
+cp .env.example .env.local # NEXT_PUBLIC_API_URL=http://localhost:4000
 npm install
-npx next dev --turbopack
+npm run dev
 ```
 
-## What Makes It Different
+Open http://localhost:3000.
 
-Most educational AI tools wrap ChatGPT and call it a day. TaleemLab has genuine depth:
+## Verify the engine
 
-- **The Student Reasoning Model isn't a score tracker** — it's a Bayesian model that hypothesizes *why* a student is struggling and recommends *what* to investigate next
-- **The AI Tutor uses the Socratic method** — it guides with questions, not just answers, and references the student's misconception history
-- **Ask the AI Anything** — students can type any question about their circuit and get an answer that references actual live values (voltage, current, component states)
-- **Everything degrades gracefully** — when AI is unavailable, the app falls back to deterministic explanations and never fully breaks
-- **The solver runs client-side** — instant feedback with zero network latency for the core interaction loop
-- **Physics goes deeper** — capacitors charge/discharge with real exponential curves, diodes drop 0.7V, and the RC time panel teaches time constants interactively
+```bash
+cd backend
+npm test
+```
+Runs 19 no-network assertions over the solver, the NL command parser, and a
+recognition type-parity guard (`test-pipeline.js`).
 
-## Built For
+## Demoing it (works even with a flaky connection)
 
-**Alibaba Cloud AI Hackathon Pakistan 2026** — *AI for Pakistan's Future*
+- **Best case:** photograph a hand-drawn series or series-parallel circuit → confirm values → predict → experiment → ask the tutor → open the AI evaluation.
+- **Zero-network path:** on the welcome screen, pick a **sample experiment** (Simple series, Series-parallel, RC charging, Diode + LED). These load instantly and drive the full simulation, predictions, SRM adaptation, discovery milestones, and progress — no API required. Use this if the venue Wi-Fi or the model quota is unreliable on stage.
 
-Target audience: Grade 9–10 physics students in schools without functional labs.
+## Known limits (honest)
+
+- The solver covers series and single-level series-parallel topologies, not arbitrary mesh networks.
+- Recognition reads standard symbols; messy or non-standard drawings can mis-read values — the app surfaces its uncertainty and asks the student to confirm rather than silently trusting a wrong read.
+- Supabase sync / teacher analytics ship as an optional layer and are off unless configured.
+
+## License
+
+MIT — see [LICENSE](./LICENSE).

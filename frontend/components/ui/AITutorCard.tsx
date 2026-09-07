@@ -22,10 +22,10 @@ export function AITutorCard({ explanation, aiThinking, onFollowUpClick }: AITuto
   // State 2: Thinking — AI is generating response
   if (aiThinking || (explanation && explanation.text === '')) {
     return (
-      <div className="ai-tutor-card ai-thinking">
+      <div className="ai-tutor-card ai-thinking" role="status" aria-live="polite" aria-busy="true">
         <div className="ai-tutor-icon"><Icon type="lightbulb" size={18} /></div>
         <div className="ai-thinking-content">
-          <h2>Your tutor is thinking...</h2>
+          <h2>Your tutor is thinking…</h2>
           <div className="ai-dots">
             <span className="dot" /><span className="dot" /><span className="dot" />
           </div>
@@ -41,7 +41,12 @@ export function AITutorCard({ explanation, aiThinking, onFollowUpClick }: AITuto
   const isAI = explanation.isAI
 
   return (
-    <div className={`ai-tutor-card ai-response ${isCorrect ? 'is-correct' : 'is-learning'}`}>
+    <div
+      className={`ai-tutor-card ai-response ${isCorrect ? 'is-correct' : 'is-learning'}`}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <div className="ai-tutor-icon">
         <Icon type={isCorrect ? 'check' : 'lightbulb'} size={18} />
       </div>
@@ -53,17 +58,26 @@ export function AITutorCard({ explanation, aiThinking, onFollowUpClick }: AITuto
         <h2>What happened?</h2>
         <p className="ai-explanation">{explanation.text}</p>
 
-        {explanation.followUp && (
-          <div
-            className={`ai-follow-up ${onFollowUpClick ? 'ai-follow-up-clickable' : ''}`}
-            onClick={onFollowUpClick ? () => onFollowUpClick(explanation.followUp!) : undefined}
+        {explanation.followUp && (onFollowUpClick ? (
+          <button
+            type="button"
+            className="ai-follow-up ai-follow-up-clickable"
+            onClick={() => onFollowUpClick(explanation.followUp!)}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <Icon type="target" size={12} />
             <span style={{ flex: 1 }}>{explanation.followUp}</span>
-            {onFollowUpClick && <span className="ai-follow-up-hint">Ask AI</span>}
+            <span className="ai-follow-up-hint">Ask AI</span>
+          </button>
+        ) : (
+          <div
+            className="ai-follow-up"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Icon type="target" size={12} />
+            <span style={{ flex: 1 }}>{explanation.followUp}</span>
           </div>
-        )}
+        ))}
 
         {explanation.insight && (
           <div className="ai-insight">

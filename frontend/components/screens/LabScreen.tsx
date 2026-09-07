@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   CircuitData, ComponentState, View, PredictionKey, Prediction,
-  Explanation, SolverFlag, SANITY_LIMITS
+  Explanation, SolverFlag, SANITY_LIMITS, CorrectionComparison
 } from '../../lib/types'
+import { STAT_COLORS } from '../../lib/colors'
 import { ExampleKey, exampleLabels } from '../../lib/exampleCircuits'
 import { getPredictions, getConceptBreakdown } from '../../lib/studentModel'
 import {
@@ -24,17 +25,9 @@ import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { CircuitContext } from '../../lib/api'
 
 const PREDICTION_HINTS: Record<PredictionKey, string> = {
-  resistance: "Remember Ohm's Law relates voltage, current, and resistance -- what does increasing one side do to the other?",
-  voltage: "Think about the relationship between the push (voltage) and the flow (current) -- if the push gets stronger, what happens?",
-  state: "Consider what a switch controls -- does it affect the path for current, or the amount of push?",
-}
-
-interface CorrectionComparison {
-  changes: { componentId: string; field: string; originalValue: number; correctedValue: number }[]
-  originalCurrent: number
-  correctedCurrent: number
-  originalTotalResistance: number | null
-  correctedTotalResistance: number | null
+  resistance: "Remember Ohm's Law relates voltage, current, and resistance — what does increasing one side do to the other?",
+  voltage: "Think about the relationship between the push (voltage) and the flow (current) — if the push gets stronger, what happens?",
+  state: "Consider what a switch controls — does it affect the path for current, or the amount of push?",
 }
 
 interface LabScreenProps {
@@ -166,13 +159,13 @@ export function LabScreen(props: LabScreenProps) {
           <h1>Your lab <span>bench</span></h1>
           <p>Change one thing at a time. Predict what happens first, then see your AI tutor&apos;s response.</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        <div className="hdr-actions">
           {selectedExample !== 'custom' ? (
             <select
               value={selectedExample}
               onChange={(e) => onSelectExample(e.target.value as ExampleKey)}
               aria-label="Choose a sample circuit"
-              style={{ padding: '6px 10px', fontSize: '12px', fontWeight: '600', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--surface)', color: 'var(--foreground)' }}
+              className="select-inline"
             >
               {Object.entries(exampleLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select>
@@ -186,29 +179,29 @@ export function LabScreen(props: LabScreenProps) {
       </div>
 
       {error && (
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 16px' }}>
+        <div className="alert-wrap">
           <div className="alert alert-danger"><Icon type="alert" size={18} /><div><strong>Error:</strong> {error}</div></div>
         </div>
       )}
 
       <div className="sim-layout">
         {/* ─── LEFT: Lab Bench + AI Tutor ─── */}
-        <section style={{ display: 'grid', gap: '12px', alignContent: 'start' }}>
+        <section className="lab-col">
           <div className="lab-bench">
             <div className="lab-bench-label">
               <span>Your experiment</span>
-              <span style={{ fontWeight: '600', color: 'var(--muted-light)' }}>{circuit?.components.length || 0} components</span>
+              <span className="count-muted">{circuit?.components.length || 0} components</span>
             </div>
             <CircuitDiagram circuit={circuit} componentStates={componentStates} closed={closed} current={current} />
             <div className="stats-grid">
-              <Stat label="Voltage" value={voltage.toString()} unit="V" color="#dc2626" />
-              <Stat label="Resistance" value={resistance.toString()} unit={'\u03A9'} color="#d97706" />
-              <Stat label="Current" value={capped ? 'Very high' : current.toFixed(3)} unit={capped ? 'real components differ' : 'A'} warning={capped} color="#0d9488" />
-              <Stat label="Brightness" value={brightness.toString()} unit="%" color="#eab308" />
+              <Stat label="Voltage" value={voltage.toString()} unit="V" color={STAT_COLORS.voltage} />
+              <Stat label="Resistance" value={resistance.toString()} unit={'\u03A9'} color={STAT_COLORS.resistance} />
+              <Stat label="Current" value={capped ? 'Very high' : current.toFixed(3)} unit={capped ? 'real components differ' : 'A'} warning={capped} color={STAT_COLORS.current} />
+              <Stat label="Brightness" value={brightness.toString()} unit="%" color={STAT_COLORS.brightness} />
             </div>
           </div>
 
-          {/* AI Tutor Card -- the hero */}
+          {/* AI Tutor Card — the hero */}
           <AITutorCard
             explanation={explanation}
             aiThinking={aiThinking}
@@ -245,7 +238,7 @@ export function LabScreen(props: LabScreenProps) {
         </section>
 
         {/* ─── CENTER: Controls ─── */}
-        <section style={{ display: 'grid', gap: '10px', alignContent: 'start' }}>
+        <section className="controls-col">
           <div className="section-label">Experiment controls</div>
 
           {/* Prediction overlay */}
@@ -273,7 +266,7 @@ export function LabScreen(props: LabScreenProps) {
           )}
 
           {/* Voltage slider */}
-          <div className="control-card" style={{ opacity: prediction ? 0.5 : 1, pointerEvents: prediction ? 'none' : 'auto' }}>
+          <div className={`control-card${prediction ? ' is-disabled' : ''}`}>
             <label htmlFor="voltage">Battery voltage <output>{voltage} V</output></label>
             <input
               id="voltage"
@@ -291,7 +284,7 @@ export function LabScreen(props: LabScreenProps) {
           </div>
 
           {/* Resistance slider */}
-          <div className="control-card" style={{ opacity: prediction ? 0.5 : 1, pointerEvents: prediction ? 'none' : 'auto' }}>
+          <div className={`control-card${prediction ? ' is-disabled' : ''}`}>
             <label htmlFor="resistance">Resistance <output>{resistance} {'\u03A9'}</output></label>
             <input
               id="resistance"
@@ -309,10 +302,10 @@ export function LabScreen(props: LabScreenProps) {
           </div>
 
           {/* Switch */}
-          <div className="switch-card" style={{ opacity: prediction ? 0.5 : 1, pointerEvents: prediction ? 'none' : 'auto' }}>
+          <div className={`switch-card${prediction ? ' is-disabled' : ''}`}>
             <div>
               <label>Switch</label>
-              <p>{closed ? 'Closed -- current can flow' : 'Open -- circuit is off'}</p>
+              <p>{closed ? 'Closed — current can flow' : 'Open — circuit is off'}</p>
             </div>
             <button
               className={`switch-toggle ${closed ? 'closed' : ''}`}
@@ -328,15 +321,14 @@ export function LabScreen(props: LabScreenProps) {
           {/* Text command (collapsible) */}
           <div>
             <button
-              className="btn-text"
+              className="btn-text btn-icon-inline"
               onClick={() => setShowCommand(!showCommand)}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
             >
               {showCommand ? <Icon type="chevron-up" size={14} /> : <Icon type="chevron-down" size={14} />}
               {showCommand ? 'Hide' : 'Or type a command'}
             </button>
             {showCommand && (
-              <div className="command-card" style={{ marginTop: '8px' }}>
+              <div className="command-card mt-8">
                 <label htmlFor="command">Describe a change in words</label>
                 <div className="command-row">
                   <input
@@ -355,7 +347,7 @@ export function LabScreen(props: LabScreenProps) {
 
           {/* Compact mastery bars */}
           {entries.length > 0 && (
-            <div className="progress-panel" style={{ marginTop: '4px' }}>
+            <div className="progress-panel mt-4">
               <div className="progress-header">
                 <span className="progress-title">Mastery</span>
                 <span className="progress-count">{totalCorrect}/{entries.length} correct</span>
@@ -390,27 +382,21 @@ export function LabScreen(props: LabScreenProps) {
         </section>
 
         {/* ─── RIGHT: Discovery + SRM ─── */}
-        <aside style={{ display: 'grid', gap: '12px', alignContent: 'start' }}>
+        <aside className="lab-col">
           <div className="section-label">Insights</div>
 
           {/* Investigation suggestion */}
           {nextInvestigation && nextInvestigation.score > 0.1 && srmSummary.totalPredictions >= 1 && (
             <div className="investigation-card">
               <div className="label">Try this next</div>
-              <p style={{ fontSize: '13px', color: 'var(--foreground)', margin: '4px 0 0', lineHeight: '1.45', fontWeight: '600' }}>
-                {nextInvestigation.suggestion}
-              </p>
-              <p style={{ fontSize: '11px', color: 'var(--muted)', margin: '4px 0 0', lineHeight: '1.4' }}>
-                {nextInvestigation.reason}
-              </p>
+              <p className="inv-suggestion">{nextInvestigation.suggestion}</p>
+              <p className="inv-reason">{nextInvestigation.reason}</p>
               {nextInvestigation.relatedMisconceptions.length > 0 && (
-                <div style={{ marginTop: '8px', display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                <div className="tag-row">
                   {nextInvestigation.relatedMisconceptions.map(id => {
                     const def = MISCONCEPTIONS.find(m => m.id === id)
                     return def ? (
-                      <span key={id} style={{ fontSize: '9px', padding: '3px 8px', background: 'var(--surface-soft)', borderRadius: '6px', color: 'var(--muted)', fontWeight: '700' }}>
-                        {def.label}
-                      </span>
+                      <span key={id} className="tag-chip">{def.label}</span>
                     ) : null
                   })}
                 </div>
@@ -442,25 +428,25 @@ export function LabScreen(props: LabScreenProps) {
           {/* Correction comparison */}
           {correctionComparison && (
             <div className="comparison-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <strong style={{ fontSize: '11px', color: 'var(--primary)', letterSpacing: '1px' }}>YOUR CORRECTION</strong>
-                <button onClick={onDismissComparison} style={{ border: 0, background: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '16px', padding: '0 4px', lineHeight: 1 }} aria-label="Dismiss">
+              <div className="row-between mb-8">
+                <strong className="compare-title">YOUR CORRECTION</strong>
+                <button onClick={onDismissComparison} className="icon-btn" aria-label="Dismiss">
                   <Icon type="x" size={16} />
                 </button>
               </div>
-              <div style={{ display: 'grid', gap: '4px', marginBottom: '8px' }}>
+              <div className="compare-list">
                 {correctionComparison.changes.map((ch, i) => (
-                  <div key={i} style={{ fontSize: '12px', color: 'var(--foreground)' }}>
+                  <div key={i} className="compare-row">
                     <strong>{ch.componentId}</strong>.{ch.field}:{' '}
-                    <span style={{ color: 'var(--danger)', textDecoration: 'line-through' }}>{ch.originalValue}{ch.field === 'resistance' ? '\u03A9' : 'V'}</span>
+                    <span className="val-original">{ch.originalValue}{ch.field === 'resistance' ? '\u03A9' : 'V'}</span>
                     {' \u2192 '}
-                    <span style={{ color: 'var(--success)', fontWeight: '700' }}>{ch.correctedValue}{ch.field === 'resistance' ? '\u03A9' : 'V'}</span>
+                    <span className="val-corrected">{ch.correctedValue}{ch.field === 'resistance' ? '\u03A9' : 'V'}</span>
                   </div>
                 ))}
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+              <div className="compare-foot">
                 {correctionComparison.originalCurrent <= 0
-                  ? `Your correction gives ${correctionComparison.correctedCurrent.toFixed(3)}A -- now the circuit works!`
+                  ? `Your correction gives ${correctionComparison.correctedCurrent.toFixed(3)}A — now the circuit works!`
                   : `With original values: ${correctionComparison.originalCurrent.toFixed(3)}A. Your correction: ${correctionComparison.correctedCurrent.toFixed(3)}A.`}
               </div>
             </div>
@@ -473,10 +459,7 @@ export function LabScreen(props: LabScreenProps) {
 
           {/* Reset */}
           {entries.length > 0 && (
-            <button
-              onClick={onResetStudentModel}
-              style={{ border: 0, background: 'none', color: 'var(--danger)', fontSize: '11px', fontWeight: '700', cursor: 'pointer', padding: '4px 0', textAlign: 'left' }}
-            >
+            <button onClick={onResetStudentModel} className="link-danger">
               Reset progress
             </button>
           )}

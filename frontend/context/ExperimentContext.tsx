@@ -1,20 +1,12 @@
 "use client"
 
 import { createContext, useContext, ReactNode } from "react"
-import { CircuitData, SolverResult, View, Prediction, Explanation, PredictionKey } from "../lib/types"
+import { CircuitData, SolverResult, View, Prediction, Explanation, PredictionKey, CorrectionComparison } from "../lib/types"
 import { ExampleKey } from "../lib/exampleCircuits"
 import { StudentModel } from "../lib/studentModel"
 import { StudentProfileForAI } from "../lib/api"
 
 // ─── Context type (matches useExperiment return value) ───────────────
-
-export interface CorrectionComparison {
-  changes: { componentId: string; field: string; originalValue: number; correctedValue: number }[]
-  originalCurrent: number
-  correctedCurrent: number
-  originalTotalResistance: number | null
-  correctedTotalResistance: number | null
-}
 
 export interface ExperimentContextValue {
   // State

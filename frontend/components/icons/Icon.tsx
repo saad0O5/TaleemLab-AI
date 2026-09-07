@@ -27,5 +27,9 @@ export function Icon({ type, size = 20 }: { type: string; size?: number }) {
   if (type === 'trophy') return <svg {...p}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>
   if (type === 'target') return <svg {...p}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
   if (type === 'alert-triangle') return <svg {...p}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+  if (type === 'capacitor') return <svg {...p}><path d="M3 12h8M13 12h8" /><line x1="11" y1="6" x2="11" y2="18" strokeWidth="2.2" /><line x1="13" y1="6" x2="13" y2="18" strokeWidth="2.2" /></svg>
+  if (type === 'diode') return <svg {...p}><path d="M3 12h5M16 12h5" /><polygon points="8,6.5 8,17.5 15,12" fill="currentColor" stroke="none" /><line x1="15" y1="6.5" x2="15" y2="17.5" strokeWidth="2.2" /></svg>
+  if (type === 'ammeter') return <svg {...p}><circle cx="12" cy="12" r="9" /><text x="12" y="16" textAnchor="middle" fontSize="10" fontWeight="800" fill="currentColor" stroke="none">A</text></svg>
+  if (type === 'voltmeter') return <svg {...p}><circle cx="12" cy="12" r="9" /><text x="12" y="16" textAnchor="middle" fontSize="10" fontWeight="800" fill="currentColor" stroke="none">V</text></svg>
   return <svg {...p}><path d="m5 12 4 4L19 6" /></svg>
 }

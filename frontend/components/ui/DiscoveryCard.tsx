@@ -12,7 +12,7 @@ export function DiscoveryCard({ title, description }: DiscoveryCardProps) {
         <Icon type="trophy" size={14} />
         <div className="discovery-label">Discovery</div>
       </div>
-      <p><strong>{title}</strong> -- {description}</p>
+      <p><strong>{title}</strong> — {description}</p>
     </div>
   )
 }

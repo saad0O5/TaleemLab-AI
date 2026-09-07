@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   CircuitComponent, CircuitData, SolverResult, SolverFlag,
-  View, PredictionKey, Prediction, Explanation
+  View, PredictionKey, Prediction, Explanation, CorrectionComparison
 } from '../lib/types'
 import {
   recognizeCircuit, solveCircuit, applyChange, sendTextCommand,
@@ -25,14 +25,6 @@ const hasBlockingFlags = (flags: SolverFlag[] | undefined) => {
     if (typeof f === 'string') return blocking.includes(f)
     return f.type === 'value_out_of_range'
   })
-}
-
-interface CorrectionComparison {
-  changes: { componentId: string; field: string; originalValue: number; correctedValue: number }[]
-  originalCurrent: number
-  correctedCurrent: number
-  originalTotalResistance: number | null
-  correctedTotalResistance: number | null
 }
 
 /** Build a student profile for the AI tutor API */

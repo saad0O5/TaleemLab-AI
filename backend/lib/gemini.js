@@ -16,7 +16,11 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
     );
   }
 
-  const modelName = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  // NOTE: model ids must be REAL, currently-served Gemini models. gemini-3.6-flash
+  // is the current default for this account; older ids like gemini-2.0-flash /
+  // gemini-1.5-flash are retired and return 404. Configurable via GEMINI_MODEL;
+  // we always try a couple of stable fallbacks if the configured one is unavailable.
+  const modelName = process.env.GEMINI_MODEL || "gemini-3.6-flash";
   const timeoutMs = options.timeoutMs || 30000;
 
   // Build content parts
@@ -64,18 +68,22 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
     contents: [{ parts }],
   });
 
-  const FALLBACK_MODELS = ["gemini-1.5-flash"];
+  const FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.5-flash"];
   const MAX_RETRIES = 2;
   const modelsToTry = [modelName, ...FALLBACK_MODELS.filter(m => m !== modelName)];
+  let lastError = "";
 
   for (const model of modelsToTry) {
     // API key sent via header (Google's preferred method) — NOT in URL
     const tryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      // Backoff: 1s, 2s, 4s
+      // Backoff before retries: ~0.5s, 1s (capped) + jitter. Google's 503 "high
+      // demand" responses are explicitly temporary, so a short bounded backoff
+      // rides out a brief spike without letting the UI hang for tens of seconds.
       if (attempt > 0) {
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+        const delay = Math.min(3000, 500 * Math.pow(2, attempt - 1)) + Math.floor(Math.random() * 400);
+        await new Promise(r => setTimeout(r, delay));
       }
 
       const controller = new AbortController();
@@ -94,15 +102,25 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
         });
       } catch (err) {
         clearTimeout(timer);
-        if (err.name === "AbortError") {
-          throw new Error("Gemini request timed out");
+        // A slow/aborted request under load is retryable — don't hard-fail on the
+        // first blip; only surface the error once the retry budget is spent.
+        lastError = err.name === "AbortError" ? "request timed out" : `network error: ${err.message}`;
+        if (attempt < MAX_RETRIES) {
+          console.warn(`Gemini ${model} ${lastError}, retrying (${attempt + 1}/${MAX_RETRIES})...`);
+          continue;
         }
-        throw new Error(`Gemini network error: ${err.message}`);
+        throw new Error(
+          err.name === "AbortError"
+            ? "Gemini request timed out"
+            : `Gemini network error: ${err.message}`
+        );
       }
       clearTimeout(timer);
 
-      // Retryable errors: 503 (unavailable), 429 (rate limit), 500 (server error)
+      // Retryable errors: 503 (high demand), 429 (rate limit), 500 (server error)
       if (response.status === 503 || response.status === 429 || response.status === 500) {
+        const errText = await response.text().catch(() => "");
+        lastError = `${response.status}: ${errText.substring(0, 160)}`;
         if (attempt < MAX_RETRIES) {
           console.warn(`Gemini ${model} returned ${response.status}, retrying (${attempt + 1}/${MAX_RETRIES})...`);
           continue;
@@ -111,14 +129,25 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
         break;
       }
 
+
       if (!response.ok) {
-        // Non-retryable error (404, 401, etc.) — try next model
-        if (response.status === 404) {
-          console.warn(`Gemini model ${model} not found, trying fallback...`);
+        const errText = await response.text().catch(() => "");
+        // Non-retryable for THIS model (bad/unsupported id, or model not served)
+        // → try the next candidate model instead of failing immediately.
+        if (response.status === 404 || response.status === 400) {
+          console.warn(`Gemini model ${model} unavailable (${response.status}), trying fallback...`);
+          lastError = `${response.status}: ${errText.substring(0, 160)}`;
           break;
         }
-        const errText = await response.text().catch(() => "");
-        throw new Error(`Gemini API error ${response.status}: ${errText.substring(0, 200)}`);
+        // Auth/access problems (401/403) — record and keep trying fallbacks,
+        // then surface one clear, actionable message after all models fail.
+        if (response.status === 401 || response.status === 403) {
+          console.warn(`Gemini rejected request for ${model} (${response.status}). Check GEMINI_API_KEY / project access.`);
+          lastError = `${response.status} (access denied): ${errText.substring(0, 160)}`;
+          break;
+        }
+        lastError = `${response.status}: ${errText.substring(0, 200)}`;
+        break;
       }
 
       const data = await response.json();
@@ -160,7 +189,11 @@ async function callGemini(textPrompt, imageBase64 = null, options = {}) {
     }
   }
 
-  throw new Error("All Gemini models unavailable — please try again later.");
+  throw new Error(
+    `All Gemini models unavailable (${modelsToTry.join(", ")}).` +
+    (lastError ? ` Last error — ${lastError}` : "") +
+    " Verify GEMINI_API_KEY and that GEMINI_MODEL is a real, currently-served model."
+  );
 }
 
 // ─── Basic usage tracking ────────────────────────────────────────────

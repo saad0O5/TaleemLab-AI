@@ -8,6 +8,7 @@ export function AIAskCard({ circuitContext, initialQuestion }: { circuitContext:
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [response, setResponse] = useState<AskAIResponse | null>(null)
+  const [askError, setAskError] = useState(false)
   const { addToast } = useToast()
 
   // When a follow-up question arrives from outside (e.g. AI tutor card),
@@ -25,12 +26,13 @@ export function AIAskCard({ circuitContext, initialQuestion }: { circuitContext:
     if (!question.trim() || loading) return
     setLoading(true)
     setResponse(null)
+    setAskError(false)
     try {
       const result = await askAI(question.trim(), circuitContext)
       setResponse(result)
       addToast('success', 'AI answered your question')
-    } catch (err) {
-      addToast('error', 'Could not reach the AI tutor')
+    } catch {
+      setAskError(true)
     } finally {
       setLoading(false)
     }
@@ -65,6 +67,11 @@ export function AIAskCard({ circuitContext, initialQuestion }: { circuitContext:
               Try: {response.tryThis}
             </p>
           )}
+        </div>
+      )}
+      {askError && !loading && (
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--danger)', fontWeight: 600, lineHeight: 1.45 }}>
+          The AI tutor is busy or offline right now. Changing the sliders still updates the simulation instantly — try asking again in a moment.
         </div>
       )}
     </div>

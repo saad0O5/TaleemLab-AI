@@ -35,6 +35,7 @@ function AppContent() {
     return <EvaluationScreen
       studentProfile={exp.buildStudentProfile()}
       onViewChange={exp.setView}
+      onStepClick={onStepClick}
     />
   }
 

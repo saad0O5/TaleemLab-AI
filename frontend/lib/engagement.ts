@@ -100,7 +100,7 @@ export function getLatestDiscovery(model: StudentModel): Discovery | null {
 
 const CHALLENGE_POOL: string[] = [
   "Can you make the current exactly 0.05A?",
-  "Double the voltage -- does the current double too?",
+  "Double the voltage — does the current double too?",
   "What happens if you open the switch? What voltage does the battery show?",
   "Try to get the current below 0.01A.",
   "Set the voltage to 12V and resistance to 600 ohms. What do you expect?",

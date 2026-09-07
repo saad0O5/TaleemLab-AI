@@ -88,3 +88,12 @@ export const SANITY_LIMITS = {
   resistance: { min: 0, max: 10000 },  // ohms
   voltage: { min: 0, max: 100 }        // volts
 };
+
+/** Comparison between the originally-recognized circuit and the student's corrections */
+export interface CorrectionComparison {
+  changes: { componentId: string; field: string; originalValue: number; correctedValue: number }[];
+  originalCurrent: number;
+  correctedCurrent: number;
+  originalTotalResistance: number | null;
+  correctedTotalResistance: number | null;
+}

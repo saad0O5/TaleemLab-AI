@@ -2,7 +2,7 @@ import { CircuitData, SolverResult, TutorResponse } from "./types";
 import { solveCircuit as localSolve, validateFieldChange } from "./circuitSolver";
 import { compressImage } from "./imageUtils";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 const API_TOKEN = process.env.NEXT_PUBLIC_API_TOKEN || "";
 
 export interface TextCommandResult extends SolverResult {
@@ -333,13 +333,8 @@ export interface CircuitContext {
 
 /**
  * Ask the AI tutor any question about the current circuit.
- * Falls back to an error message on network failure.
+ * Throws on failure so the caller can show an inline error.
  */
 export async function askAI(question: string, circuitContext: CircuitContext): Promise<AskAIResponse> {
-  try {
-    return await postJSON<AskAIResponse>("/api/ask-ai", { question, circuitContext });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return { answer: `I couldn't connect to the AI tutor right now. ${message}`, tryThis: "" };
-  }
+  return await postJSON<AskAIResponse>("/api/ask-ai", { question, circuitContext });
 }

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
+    "test": "node test-pipeline.js",
     "test:pipeline": "node test-pipeline.js"
   },
   "dependencies": {

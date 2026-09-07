@@ -160,7 +160,7 @@ export function ProgressScreen({ studentModel, buildStudentProfile, onViewChange
               <div className="ai-dots">
                 <span className="dot" /><span className="dot" /><span className="dot" />
               </div>
-              <span>Generating your learning summary...</span>
+              <span>Generating your learning summary…</span>
             </div>
           ) : (
             <p className="learning-summary-text">{summary}</p>

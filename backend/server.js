@@ -12,7 +12,7 @@ const { handleTextCommand } = require("./routes/textCommand");
 const { handleExplainPrediction, handleLearningSummary, handleEvaluateStudent } = require("./routes/aiTutor");
 const { handleAskAI } = require("./routes/askAI");
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 // ─── CORS Allowlist ──────────────────────────────────────────────────
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:3000")

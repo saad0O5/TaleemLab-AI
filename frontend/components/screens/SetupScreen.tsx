@@ -210,9 +210,11 @@ export function SetupScreen({ circuit, solverResult, error, onUpdateComponentVal
                   <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
                     {(c.type === 'resistor' || c.type === 'bulb') && (
                       <div className="component-field">
-                        <label>Resistance</label>
+                        <label htmlFor={`resistance-${c.id}`}>Resistance</label>
                         <input
+                          id={`resistance-${c.id}`}
                           type="number"
+                          min={0}
                           className={resistanceFlag ? 'danger' : resistanceUncertain ? 'warning' : ''}
                           value={c.resistance ?? ''}
                           onChange={(e) => onUpdateComponentValue(c.id, 'resistance', Number(e.target.value))}
@@ -224,9 +226,11 @@ export function SetupScreen({ circuit, solverResult, error, onUpdateComponentVal
                     {c.type === 'battery' && (
                       <>
                         <div className="component-field">
-                          <label>Voltage</label>
+                          <label htmlFor={`voltage-${c.id}`}>Voltage</label>
                           <input
+                            id={`voltage-${c.id}`}
                             type="number"
+                            min={0}
                             className={voltageFlag ? 'danger' : voltageUncertain ? 'warning' : ''}
                             value={c.voltage ?? ''}
                             onChange={(e) => onUpdateComponentValue(c.id, 'voltage', Number(e.target.value))}
@@ -234,8 +238,8 @@ export function SetupScreen({ circuit, solverResult, error, onUpdateComponentVal
                           <span className="unit">V</span>
                         </div>
                         <div className="component-field">
-                          <label>Direction</label>
-                          <div className="pill-group">
+                          <label id={`direction-label-${c.id}`}>Direction</label>
+                          <div className="pill-group" role="group" aria-labelledby={`direction-label-${c.id}`}>
                             <button
                               type="button"
                               className={`pill ${c.polarity === 'same' ? 'active-green' : ''}`}
@@ -257,8 +261,8 @@ export function SetupScreen({ circuit, solverResult, error, onUpdateComponentVal
 
                     {c.type === 'switch' && (
                       <div className="component-field">
-                        <label>State</label>
-                        <div className="pill-group">
+                        <label id={`state-label-${c.id}`}>State</label>
+                        <div className="pill-group" role="group" aria-labelledby={`state-label-${c.id}`}>
                           <button
                             type="button"
                             className={`pill ${c.state === 'open' ? 'active-gray' : ''}`}
@@ -274,6 +278,28 @@ export function SetupScreen({ circuit, solverResult, error, onUpdateComponentVal
                             Closed
                           </button>
                         </div>
+                      </div>
+                    )}
+
+                    {c.type === 'capacitor' && (
+                      <div className="component-field">
+                        <label htmlFor={`capacitance-${c.id}`}>Capacitance</label>
+                        <input
+                          id={`capacitance-${c.id}`}
+                          type="number"
+                          min={0}
+                          className={resistanceUncertain ? 'warning' : ''}
+                          value={c.capacitance ?? ''}
+                          onChange={(e) => onUpdateComponentValue(c.id, 'capacitance', Number(e.target.value))}
+                        />
+                        <span className="unit">{'\u03BCF'}</span>
+                      </div>
+                    )}
+
+                    {c.type === 'diode' && (
+                      <div className="component-field">
+                        <label>Model</label>
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--muted)', alignSelf: 'center' }}>0.7 V forward drop</span>
                       </div>
                     )}
                   </div>

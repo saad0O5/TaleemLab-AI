@@ -7,6 +7,13 @@ export const metadata: Metadata = {
   description: 'Turn hand-drawn diagrams into interactive experiments. A virtual lab for students who learn by doing.',
   generator: 'TaleemLab',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/icon-light-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-icon.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

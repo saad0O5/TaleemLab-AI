@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CircuitComponent, CircuitData, ComponentState } from '../../lib/types'
+import { TYPE_COLORS } from '../../lib/colors'
 
 interface CircuitDiagramProps {
   circuit: CircuitData | null
@@ -20,16 +21,7 @@ type LayoutUnit =
   | { kind: 'group'; components: CircuitComponent[] }
 
 /* ─── Colors per component type ─── */
-const TYPE_COLORS: Record<string, string> = {
-  battery: '#dc2626',
-  resistor: '#d97706',
-  switch: '#2563eb',
-  bulb: '#eab308',
-  ammeter: '#7c3aed',
-  voltmeter: '#059669',
-  capacitor: '#ec4899',
-  diode: '#06b6d4',
-}
+/* TYPE_COLORS is imported from lib/colors (single source of truth). */
 
 /* ─── Helpers ─── */
 
@@ -89,8 +81,12 @@ function BatterySymbol({ s }: { s: number }) {
       <line x1={-5 * s} y1={-14 * s} x2={-5 * s} y2={14 * s} strokeWidth={2.5} />
       <line x1={5 * s} y1={-8 * s} x2={5 * s} y2={8 * s} strokeWidth={4} />
       <line x1={5 * s} y1={0} x2={20 * s} y2={0} />
-      <text x={0} y={-19 * s} textAnchor="middle" fontSize={11 * s} fontWeight="700" fill={TYPE_COLORS.battery} stroke="none">
-        +           −
+      {/* Terminal labels: long thin plate = +, short thick plate = − */}
+      <text x={-11 * s} y={-16 * s} textAnchor="middle" fontSize={12 * s} fontWeight="800" fill={TYPE_COLORS.battery} stroke="none">
+        +
+      </text>
+      <text x={11 * s} y={-16 * s} textAnchor="middle" fontSize={12 * s} fontWeight="800" fill={TYPE_COLORS.battery} stroke="none">
+        −
       </text>
     </g>
   )
