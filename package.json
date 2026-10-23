@@ -2,9 +2,12 @@
   "name": "taleemlab-ai",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
-    "vercel-build": "cd frontend && npm install && npm run build"
+    "build": "cd frontend && npm run build",
+    "vercel-build": "cd frontend && npm run build"
   },
   "dependencies": {
     "next": "16.3.0",
