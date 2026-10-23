@@ -53,7 +53,15 @@ export interface SolverResult {
   explanation?: string;
 }
 
-export type View = "capture" | "confirm" | "simulate" | "progress" | "evaluation";
+export type View = "onboarding" | "dashboard" | "capture" | "confirm" | "simulate" | "progress" | "evaluation" | "profile";
+
+export type SubjectId = "physics" | "chemistry" | "biology" | "computer";
+
+export type Language = "en" | "ur";
+
+export type LabMode = "simulate" | "sandbox";
+
+export type MobileTab = "controls" | "sandbox" | "tutor" | "insights";
 
 export type PredictionKey = "resistance" | "voltage" | "state";
 

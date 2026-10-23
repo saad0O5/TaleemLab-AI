@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, ReactNode } from "react"
-import { CircuitData, SolverResult, View, Prediction, Explanation, PredictionKey, CorrectionComparison } from "../lib/types"
+import { CircuitData, SolverResult, View, Prediction, Explanation, PredictionKey, CorrectionComparison, SubjectId, LabMode, MobileTab, CircuitComponent, Language } from "../lib/types"
 import { ExampleKey } from "../lib/exampleCircuits"
 import { StudentModel } from "../lib/studentModel"
 import { StudentProfileForAI } from "../lib/api"
@@ -10,6 +10,14 @@ import { StudentProfileForAI } from "../lib/api"
 
 export interface ExperimentContextValue {
   // State
+  subject: SubjectId
+  setSubject: (s: SubjectId) => void
+  language: Language
+  setLanguage: (l: Language) => void
+  labMode: LabMode
+  setLabMode: (m: LabMode) => void
+  mobileTab: MobileTab
+  setMobileTab: (t: MobileTab) => void
   view: View
   setView: (v: View) => void
   voltage: number
@@ -51,6 +59,9 @@ export interface ExperimentContextValue {
   handleCameraFallback: () => void
   updateComponentValue: (componentId: string, field: string, value: any) => Promise<void>
   addBattery: () => Promise<void>
+  addComponent: (type: CircuitComponent['type'], options?: { resistance?: number; voltage?: number; capacitance?: number; asParallelWith?: string }) => Promise<void>
+  removeComponent: (id: string) => Promise<void>
+  cancelPrediction: () => void
   autoCompleteCircuit: () => Promise<void>
   handleContinueToSimulate: () => Promise<void>
   change: (key: PredictionKey, next: any, direction: "up" | "down", answer: "up" | "down" | "same") => Promise<void>

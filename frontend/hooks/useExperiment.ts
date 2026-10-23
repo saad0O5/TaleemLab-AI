@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   CircuitComponent, CircuitData, SolverResult, SolverFlag,
-  View, PredictionKey, Prediction, Explanation, CorrectionComparison
+  View, PredictionKey, Prediction, Explanation, CorrectionComparison,
+  SubjectId, LabMode, MobileTab, Language
 } from '../lib/types'
 import {
   recognizeCircuit, solveCircuit, applyChange, sendTextCommand,
@@ -69,7 +70,11 @@ function buildStudentProfile(model: StudentModel): StudentProfileForAI {
 }
 
 export function useExperiment() {
-  const [view, setView] = useState<View>('capture')
+  const [subject, setSubject] = useState<SubjectId>('physics')
+  const [language, setLanguage] = useState<Language>('en')
+  const [labMode, setLabMode] = useState<LabMode>('simulate')
+  const [mobileTab, setMobileTab] = useState<MobileTab>('controls')
+  const [view, setView] = useState<View>('dashboard')
   const [voltage, setVoltage] = useState(9)
   const [resistance, setResistance] = useState(470)
   const [closed, setClosed] = useState(false)
@@ -267,6 +272,125 @@ export function useExperiment() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const addComponent = async (
+    type: CircuitComponent['type'],
+    options: { resistance?: number; voltage?: number; capacitance?: number; asParallelWith?: string } = {}
+  ) => {
+    if (!circuit) return
+    const existingOfType = circuit.components.filter(c => c.type === type).length
+    const newId = `${type}_${existingOfType + 1}`
+
+    const newComp: CircuitComponent = {
+      id: newId,
+      type,
+      connects_to: [],
+    }
+
+    if (type === 'battery') {
+      newComp.voltage = options.voltage ?? 9
+      newComp.polarity = 'same'
+    } else if (type === 'resistor') {
+      newComp.resistance = options.resistance ?? 220
+    } else if (type === 'bulb') {
+      newComp.resistance = options.resistance ?? 30
+    } else if (type === 'switch') {
+      newComp.state = 'closed'
+    } else if (type === 'capacitor') {
+      newComp.capacitance = options.capacitance ?? 100
+    }
+
+    let updatedComponents = [...circuit.components, newComp]
+    let updatedParallelGroups = circuit.parallel_groups ? circuit.parallel_groups.map(g => [...g]) : []
+    let updatedTopology = circuit.topology
+
+    if (options.asParallelWith) {
+      const existingGroup = updatedParallelGroups.find(g => g.includes(options.asParallelWith!))
+      if (existingGroup) {
+        existingGroup.push(newId)
+      } else {
+        updatedParallelGroups.push([options.asParallelWith, newId])
+      }
+      updatedTopology = 'series_parallel'
+    }
+
+    // Re-link connections in a closed loop
+    for (let i = 0; i < updatedComponents.length; i++) {
+      const nextIndex = (i + 1) % updatedComponents.length
+      updatedComponents[i].connects_to = [updatedComponents[nextIndex].id]
+    }
+
+    const updatedCircuit: CircuitData = {
+      ...circuit,
+      topology: updatedTopology,
+      parallel_groups: updatedParallelGroups,
+      components: updatedComponents,
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      const res = await solveCircuit(updatedCircuit)
+      setCircuit(updatedCircuit)
+      setSolverResult(res)
+
+      const bat = updatedComponents.find(c => c.type === 'battery')
+      const resis = updatedComponents.find(c => c.type === 'resistor')
+      const bulb = updatedComponents.find(c => c.type === 'bulb')
+      if (bat) setVoltage(bat.voltage ?? 9)
+      if (resis) setResistance(resis.resistance ?? 220)
+      else if (bulb) setResistance(bulb.resistance ?? 30)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add component.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const removeComponent = async (componentId: string) => {
+    if (!circuit || circuit.components.length <= 1) return
+    const updatedComponents = circuit.components.filter(c => c.id !== componentId)
+    const updatedParallelGroups = (circuit.parallel_groups || [])
+      .map(g => g.filter(id => id !== componentId))
+      .filter(g => g.length > 1)
+
+    const updatedTopology = updatedParallelGroups.length > 0 ? 'series_parallel' : 'series'
+
+    for (let i = 0; i < updatedComponents.length; i++) {
+      const nextIndex = (i + 1) % updatedComponents.length
+      updatedComponents[i].connects_to = [updatedComponents[nextIndex].id]
+    }
+
+    const updatedCircuit: CircuitData = {
+      ...circuit,
+      topology: updatedTopology,
+      parallel_groups: updatedParallelGroups,
+      components: updatedComponents,
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      const res = await solveCircuit(updatedCircuit)
+      setCircuit(updatedCircuit)
+      setSolverResult(res)
+
+      const bat = updatedComponents.find(c => c.type === 'battery')
+      const resis = updatedComponents.find(c => c.type === 'resistor')
+      const bulb = updatedComponents.find(c => c.type === 'bulb')
+      if (bat) setVoltage(bat.voltage ?? 0)
+      if (resis) setResistance(resis.resistance ?? 0)
+      else if (bulb) setResistance(bulb.resistance ?? 0)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to remove component.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const cancelPrediction = () => {
+    setPrediction(null)
   }
 
   const autoCompleteCircuit = async () => {
@@ -529,6 +653,10 @@ export function useExperiment() {
 
   return {
     // State
+    subject, setSubject,
+    language, setLanguage,
+    labMode, setLabMode,
+    mobileTab, setMobileTab,
     view, setView,
     voltage, resistance, closed,
     prediction, explanation, aiThinking,
@@ -555,6 +683,9 @@ export function useExperiment() {
     handleCameraFallback,
     updateComponentValue,
     addBattery,
+    addComponent,
+    removeComponent,
+    cancelPrediction,
     autoCompleteCircuit,
     handleContinueToSimulate,
     change,

@@ -36,3 +36,5 @@ Thumbs.db
 .vercel/
 .vercel
 .env*
+AGENTS.md
+CLAUDE.md

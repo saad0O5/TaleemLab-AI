@@ -7,6 +7,7 @@ interface CircuitDiagramProps {
   componentStates: ComponentState[]
   closed: boolean
   current: number
+  voltage?: number
 }
 
 /* ─── Geometry ─── */
@@ -19,11 +20,6 @@ type Edge = 'top' | 'right' | 'bottom' | 'left'
 type LayoutUnit =
   | { kind: 'single'; component: CircuitComponent }
   | { kind: 'group'; components: CircuitComponent[] }
-
-/* ─── Colors per component type ─── */
-/* TYPE_COLORS is imported from lib/colors (single source of truth). */
-
-/* ─── Helpers ─── */
 
 function pointAt(distance: number): { x: number; y: number; edge: Edge } {
   const t = ((distance % PERIMETER) + PERIMETER) % PERIMETER
@@ -72,27 +68,55 @@ function edgeRotation(edge: Edge): number {
   return edge === 'top' ? 0 : edge === 'right' ? 90 : edge === 'bottom' ? 180 : 270
 }
 
-/* ─── SVG Symbols (drawn in horizontal orientation, left→right) ─── */
+/* ─── PhET-Style Component Symbols (Lifelike & Schematic) ─── */
 
-function BatterySymbol({ s }: { s: number }) {
+function BatterySymbol({ s, lifelike }: { s: number; lifelike: boolean }) {
+  if (lifelike) {
+    return (
+      <g>
+        <line x1={-20 * s} y1={0} x2={-14 * s} y2={0} stroke="#475569" strokeWidth={2.5} />
+        {/* AA Battery Body */}
+        <rect x={-14 * s} y={-10 * s} width={28 * s} height={20 * s} rx={2.5 * s} fill="#1E293B" stroke="#0F172A" strokeWidth={1} />
+        {/* Golden copper collar */}
+        <rect x={-14 * s} y={-10 * s} width={8 * s} height={20 * s} rx={2 * s} fill="#D97706" />
+        {/* Positive terminal nipple */}
+        <rect x={-17 * s} y={-4 * s} width={3.5 * s} height={8 * s} rx={1} fill="#94A3B8" />
+        <text x={-10 * s} y={4 * s} fontSize={9 * s} fontWeight="900" fill="#FFFFFF" textAnchor="middle" stroke="none">+</text>
+        <text x={7 * s} y={4 * s} fontSize={9 * s} fontWeight="900" fill="#94A3B8" textAnchor="middle" stroke="none">−</text>
+        <line x1={14 * s} y1={0} x2={20 * s} y2={0} stroke="#475569" strokeWidth={2.5} />
+      </g>
+    )
+  }
+
   return (
     <g>
       <line x1={-20 * s} y1={0} x2={-5 * s} y2={0} />
       <line x1={-5 * s} y1={-14 * s} x2={-5 * s} y2={14 * s} strokeWidth={2.5} />
       <line x1={5 * s} y1={-8 * s} x2={5 * s} y2={8 * s} strokeWidth={4} />
       <line x1={5 * s} y1={0} x2={20 * s} y2={0} />
-      {/* Terminal labels: long thin plate = +, short thick plate = − */}
-      <text x={-11 * s} y={-16 * s} textAnchor="middle" fontSize={12 * s} fontWeight="800" fill={TYPE_COLORS.battery} stroke="none">
-        +
-      </text>
-      <text x={11 * s} y={-16 * s} textAnchor="middle" fontSize={12 * s} fontWeight="800" fill={TYPE_COLORS.battery} stroke="none">
-        −
-      </text>
+      <text x={-11 * s} y={-16 * s} textAnchor="middle" fontSize={12 * s} fontWeight="800" fill={TYPE_COLORS.battery} stroke="none">+</text>
+      <text x={11 * s} y={-16 * s} textAnchor="middle" fontSize={12 * s} fontWeight="800" fill={TYPE_COLORS.battery} stroke="none">−</text>
     </g>
   )
 }
 
-function ResistorSymbol({ s }: { s: number }) {
+function ResistorSymbol({ s, lifelike }: { s: number; lifelike: boolean }) {
+  if (lifelike) {
+    return (
+      <g>
+        <line x1={-20 * s} y1={0} x2={-12 * s} y2={0} stroke="#64748B" strokeWidth={2.5} />
+        {/* Ceramic body */}
+        <rect x={-12 * s} y={-7 * s} width={24 * s} height={14 * s} rx={5 * s} fill="#E2E8F0" stroke="#94A3B8" strokeWidth={1} />
+        {/* Color bands: Brown, Black, Red, Gold */}
+        <rect x={-8 * s} y={-7 * s} width={2.5 * s} height={14 * s} fill="#78350F" />
+        <rect x={-3 * s} y={-7 * s} width={2.5 * s} height={14 * s} fill="#000000" />
+        <rect x={2 * s} y={-7 * s} width={2.5 * s} height={14 * s} fill="#DC2626" />
+        <rect x={7 * s} y={-7 * s} width={2 * s} height={14 * s} fill="#EAB308" />
+        <line x1={12 * s} y1={0} x2={20 * s} y2={0} stroke="#64748B" strokeWidth={2.5} />
+      </g>
+    )
+  }
+
   const w = 16 * s, h = 8 * s
   const d = `M${-20 * s},0 H${-w} L${-w + 3 * s},${-h} L${-w + 7 * s},${h} L${-w + 11 * s},${-h} L${-w + 15 * s},${h} L${-w + 19 * s},${-h} L${-w + 23 * s},${h} L${w},0 H${20 * s}`
   return <path d={d} strokeLinejoin="round" />
@@ -107,29 +131,59 @@ function SwitchSymbol({ s, closed }: { s: number; closed: boolean }) {
       <line
         x1={-8 * s} y1={0}
         x2={closed ? 8 * s : 6 * s}
-        y2={closed ? 0 : -12 * s}
-        strokeWidth={2.5}
+        y2={closed ? 0 : -14 * s}
+        strokeWidth={3}
       />
       <line x1={8 * s} y1={0} x2={20 * s} y2={0} />
     </g>
   )
 }
 
-function BulbSymbol({ s, brightness }: { s: number; brightness: number }) {
+function BulbSymbol({ s, brightness, lifelike }: { s: number; brightness: number; lifelike: boolean }) {
   const r = 10 * s
+  const rayLen = 8 * s + brightness * 16 * s
+  const rayAlpha = Math.min(0.9, 0.2 + brightness * 0.7)
+
   return (
     <g>
       <line x1={-20 * s} y1={0} x2={-r} y2={0} />
-      {brightness > 0 && (
-        <circle cx={0} cy={0} r={r + 5 * s} fill={`rgba(234,179,8,${brightness * 0.15})`} stroke="none" />
+
+      {/* PhET Radiant Glow Rays when lit */}
+      {brightness > 0.05 && (
+        <g stroke="#EAB308" strokeWidth={2 * s} strokeLinecap="round" opacity={rayAlpha}>
+          {/* 8 Radial Light Rays */}
+          <line x1={0} y1={-r - 2} x2={0} y2={-r - rayLen} />
+          <line x1={0} y1={r + 2} x2={0} y2={r + rayLen} />
+          <line x1={-r - 2} y1={0} x2={-r - rayLen} y2={0} />
+          <line x1={r + 2} y1={0} x2={r + rayLen} y2={0} />
+          <line x1={-r * 0.7} y1={-r * 0.7} x2={(-r - rayLen) * 0.7} y2={(-r - rayLen) * 0.7} />
+          <line x1={r * 0.7} y1={-r * 0.7} x2={(r + rayLen) * 0.7} y2={(-r - rayLen) * 0.7} />
+          <line x1={-r * 0.7} y1={r * 0.7} x2={(-r - rayLen) * 0.7} y2={(r + rayLen) * 0.7} />
+          <line x1={r * 0.7} y1={r * 0.7} x2={(r + rayLen) * 0.7} y2={(r + rayLen) * 0.7} />
+        </g>
       )}
+
+      {/* Outer ambient glow halo */}
+      {brightness > 0 && (
+        <circle cx={0} cy={0} r={r + 10 * s} fill={`rgba(250, 204, 21, ${brightness * 0.35})`} stroke="none" />
+      )}
+
+      {/* Glass Bulb Dome */}
       <circle
         cx={0} cy={0} r={r}
-        fill={brightness > 0 ? `rgba(234,179,8,${brightness * 0.25})` : 'none'}
+        fill={brightness > 0 ? `rgba(254, 240, 138, ${0.4 + brightness * 0.5})` : (lifelike ? 'rgba(241, 245, 249, 0.6)' : 'none')}
+        stroke={lifelike ? '#E2E8F0' : 'currentColor'}
         strokeWidth={2.5}
       />
-      <line x1={-r * 0.6} y1={-r * 0.6} x2={r * 0.6} y2={r * 0.6} strokeWidth={2} />
-      <line x1={r * 0.6} y1={-r * 0.6} x2={-r * 0.6} y2={r * 0.6} strokeWidth={2} />
+
+      {/* Internal Filament */}
+      <path
+        d={`M${-4 * s},${3 * s} L${-2 * s},${-4 * s} L${0},${-2 * s} L${2 * s},${-4 * s} L${4 * s},${3 * s}`}
+        fill="none"
+        stroke={brightness > 0 ? '#F59E0B' : '#94A3B8'}
+        strokeWidth={2}
+      />
+
       <line x1={r} y1={0} x2={20 * s} y2={0} />
     </g>
   )
@@ -171,12 +225,12 @@ function DiodeSymbol({ s }: { s: number }) {
   )
 }
 
-function renderSymbol(type: string, s: number, switchClosed: boolean, brightness: number) {
+function renderSymbol(type: string, s: number, switchClosed: boolean, brightness: number, lifelike: boolean) {
   switch (type) {
-    case 'battery': return <BatterySymbol s={s} />
-    case 'resistor': return <ResistorSymbol s={s} />
+    case 'battery': return <BatterySymbol s={s} lifelike={lifelike} />
+    case 'resistor': return <ResistorSymbol s={s} lifelike={lifelike} />
     case 'switch': return <SwitchSymbol s={s} closed={switchClosed} />
-    case 'bulb': return <BulbSymbol s={s} brightness={brightness} />
+    case 'bulb': return <BulbSymbol s={s} brightness={brightness} lifelike={lifelike} />
     case 'ammeter': return <MeterSymbol s={s} label="A" />
     case 'voltmeter': return <MeterSymbol s={s} label="V" />
     case 'capacitor': return <CapacitorSymbol s={s} />
@@ -185,11 +239,9 @@ function renderSymbol(type: string, s: number, switchClosed: boolean, brightness
   }
 }
 
-/* ─── Diagram Node ─── */
-
-function DiagramNode({ component, x, y, size, edge, state, sideLabels, onHover }: {
+function DiagramNode({ component, x, y, size, edge, state, sideLabels, onHover, lifelike }: {
   component: CircuitComponent; x: number; y: number; size: number
-  edge: Edge; state?: ComponentState; sideLabels?: boolean
+  edge: Edge; state?: ComponentState; sideLabels?: boolean; lifelike: boolean
   onHover?: (comp: CircuitComponent, state: ComponentState | undefined, x: number, y: number) => void
 }) {
   const color = TYPE_COLORS[component.type] || 'var(--primary)'
@@ -198,7 +250,6 @@ function DiagramNode({ component, x, y, size, edge, state, sideLabels, onHover }
   const rot = edgeRotation(edge)
   const s = size / 42
 
-  // Label position — always readable, placed away from wires
   let idPos: { x: number; y: number }
   let valPos: { x: number; y: number }
   let anchor: 'middle' | 'start' | 'end'
@@ -224,10 +275,8 @@ function DiagramNode({ component, x, y, size, edge, state, sideLabels, onHover }
       onMouseEnter={() => onHover?.(component, state, x, y)}
       style={{ cursor: 'pointer' }}
     >
-      {/* Mask circle to hide wire behind component */}
       <circle cx={0} cy={0} r={size / 2 + 6} fill="var(--surface)" stroke="none" />
 
-      {/* Colored symbol */}
       <g
         transform={`rotate(${rot})`}
         style={{
@@ -239,15 +288,13 @@ function DiagramNode({ component, x, y, size, edge, state, sideLabels, onHover }
           strokeLinejoin: 'round' as const,
         }}
       >
-        {renderSymbol(component.type, s, component.state === 'closed', brightness)}
+        {renderSymbol(component.type, s, component.state === 'closed', brightness, lifelike)}
       </g>
 
-      {/* Component ID label */}
       <text x={idPos.x} y={idPos.y} textAnchor={anchor} fontSize="11" fontWeight="700" fill="var(--foreground)" stroke="none">
         {component.id.replace(/_/g, ' ')}
       </text>
 
-      {/* Value label with colored indicator */}
       {value && (
         <text x={valPos.x} y={valPos.y} textAnchor={anchor} fontSize="10" fontWeight="600" fill={color} stroke="none" opacity="0.85">
           {value}
@@ -257,11 +304,9 @@ function DiagramNode({ component, x, y, size, edge, state, sideLabels, onHover }
   )
 }
 
-/* ─── Parallel Group Node ─── */
-
-function GroupNode({ components, x, y, size, edge, states }: {
+function GroupNode({ components, x, y, size, edge, states, lifelike }: {
   components: CircuitComponent[]; x: number; y: number
-  size: number; edge: Edge; states: ComponentState[]
+  size: number; edge: Edge; states: ComponentState[]; lifelike: boolean
 }) {
   const k = components.length
   const gap = Math.min(size + 22, (LOOP_H - 30) / k)
@@ -271,12 +316,9 @@ function GroupNode({ components, x, y, size, edge, states }: {
 
   return (
     <g transform={`translate(${x} ${y})`}>
-      {/* Junction line */}
       <line x1={0} y1={jTop} x2={0} y2={jBot} stroke="var(--primary)" strokeWidth={2.5} strokeLinecap="round" />
-      {/* Junction dots */}
       <circle cx={0} cy={jTop} r={4} fill="var(--primary)" stroke="none" />
       <circle cx={0} cy={jBot} r={4} fill="var(--primary)" stroke="none" />
-      {/* Members */}
       {components.map((component, i) => (
         <DiagramNode
           key={component.id}
@@ -287,13 +329,12 @@ function GroupNode({ components, x, y, size, edge, states }: {
           edge={edge}
           state={states.find((st) => st.id === component.id)}
           sideLabels
+          lifelike={lifelike}
         />
       ))}
     </g>
   )
 }
-
-/* ─── Wire Builder ─── */
 
 function perimeterDist(p: { x: number; y: number; edge: Edge }): number {
   switch (p.edge) {
@@ -343,7 +384,11 @@ function buildWireSegments(positions: { x: number; y: number; edge: Edge }[], ga
 
 /* ─── Main Component ─── */
 
-export function CircuitDiagram({ circuit, componentStates, closed, current }: CircuitDiagramProps) {
+export function CircuitDiagram({ circuit, componentStates, closed, current, voltage = 9 }: CircuitDiagramProps) {
+  const [lifelike, setLifelike] = useState(true)
+  const [showMultimeter, setShowMultimeter] = useState(false)
+  const [showElectrons, setShowElectrons] = useState(true)
+
   const rawUnits = circuit ? layoutUnits(circuit) : []
   const units = sortUnits(rawUnits)
   const n = units.length
@@ -362,27 +407,81 @@ export function CircuitDiagram({ circuit, componentStates, closed, current }: Ci
     setTooltip({ comp, state, x, y })
   }
 
+  // 12 PhET Electron particle offsets
+  const electronOffsets = Array.from({ length: 12 }, (_, i) => i / 12)
+  const animDuration = Math.max(0.6, 3.2 - Math.min(2.5, Math.sqrt(current) * 1.3))
+
   return (
     <div
       className={`sim-diagram ${closed ? 'is-flowing' : ''}`}
       style={{ '--pulse-speed': `${Math.max(0.2, 2.5 - Math.sqrt(current) * 1.05)}s` } as React.CSSProperties}
       onMouseLeave={() => setTooltip(null)}
     >
+      {/* PhET Control Bar */}
+      <div className="phet-toolbar">
+        <div className="phet-mode-toggles">
+          <button
+            className={`phet-pill-btn ${lifelike ? 'active' : ''}`}
+            onClick={() => setLifelike(true)}
+            type="button"
+          >
+            🎨 Lifelike View
+          </button>
+          <button
+            className={`phet-pill-btn ${!lifelike ? 'active' : ''}`}
+            onClick={() => setLifelike(false)}
+            type="button"
+          >
+            📐 Schematic
+          </button>
+        </div>
+
+        <div className="phet-tool-actions">
+          <button
+            className={`phet-tool-btn ${showElectrons ? 'active' : ''}`}
+            onClick={() => setShowElectrons(!showElectrons)}
+            type="button"
+            title="Toggle PhET Electron Flow"
+          >
+            🔵 Electrons {showElectrons ? 'ON' : 'OFF'}
+          </button>
+
+          <button
+            className={`phet-tool-btn ${showMultimeter ? 'active' : ''}`}
+            onClick={() => setShowMultimeter(!showMultimeter)}
+            type="button"
+            title="Toggle Voltmeter"
+          >
+            📟 Multimeter
+          </button>
+        </div>
+      </div>
+
       <svg viewBox="0 0 560 310" role="img" aria-label="Circuit diagram">
         {/* Subtle background */}
-        <rect x="2" y="2" width="556" height="306" rx="12" fill="var(--surface-soft)" stroke="var(--border)" strokeWidth="1" opacity="0.5" />
+        <rect x="2" y="2" width="556" height="306" rx="12" fill="var(--surface-soft)" stroke="var(--border)" strokeWidth="1" opacity="0.6" />
 
         {/* Wire paths */}
         <defs>
           <path id="wire-loop" d={wireSegments.join(' ')} />
+          <filter id="phetGlow">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
         </defs>
 
-        {/* Wires */}
+        {/* Copper Wires */}
         {wireSegments.map((d, i) => (
-          <path key={i} className="circuit-wire" d={d} />
+          <path
+            key={i}
+            className="circuit-wire"
+            d={d}
+            stroke={lifelike ? '#B45309' : 'currentColor'}
+            strokeWidth={lifelike ? 4 : 2.5}
+          />
         ))}
 
-        {/* Junction dots at wire-component boundaries */}
+        {/* Junction dots */}
         {positions.map((p, i) => {
           const halfGap = gapForWire / 2
           const dist = perimeterDist(p)
@@ -390,23 +489,25 @@ export function CircuitDiagram({ circuit, componentStates, closed, current }: Ci
           const after = pointAt((dist + halfGap) % PERIMETER)
           return (
             <g key={`dots-${i}`}>
-              <circle cx={before.x} cy={before.y} r="3.5" className="wire-dot" />
-              <circle cx={after.x} cy={after.y} r="3.5" className="wire-dot" />
+              <circle cx={before.x} cy={before.y} r={lifelike ? 4 : 3.5} fill={lifelike ? '#D97706' : 'var(--primary)'} stroke="none" />
+              <circle cx={after.x} cy={after.y} r={lifelike ? 4 : 3.5} fill={lifelike ? '#D97706' : 'var(--primary)'} stroke="none" />
             </g>
           )
         })}
 
-        {/* Current flow particles (animated dots traveling clockwise) */}
-        {closed && current > 0 && [0, 0.33, 0.66].map((offset, i) => (
-          <circle key={`particle-${i}`} r="4.5" className="flow-particle">
-            <animateMotion
-              dur={`${Math.max(0.8, 3 - Math.sqrt(current) * 1.2)}s`}
-              repeatCount="indefinite"
-              begin={`${offset * Math.max(0.8, 3 - Math.sqrt(current) * 1.2)}s`}
-            >
-              <mpath href="#wire-loop" />
-            </animateMotion>
-          </circle>
+        {/* PhET Moving Blue Electrons */}
+        {showElectrons && closed && current > 0 && electronOffsets.map((offset, i) => (
+          <g key={`electron-${i}`}>
+            <circle r="4.5" fill="#38BDF8" stroke="#0284C7" strokeWidth="1" filter="url(#phetGlow)">
+              <animateMotion
+                dur={`${animDuration}s`}
+                repeatCount="indefinite"
+                begin={`${offset * animDuration}s`}
+              >
+                <mpath href="#wire-loop" />
+              </animateMotion>
+            </circle>
+          </g>
         ))}
 
         {/* Components */}
@@ -420,6 +521,7 @@ export function CircuitDiagram({ circuit, componentStates, closed, current }: Ci
                 x={x} y={y} size={size} edge={edge}
                 state={componentStates.find((s) => s.id === unit.component.id)}
                 onHover={handleHover}
+                lifelike={lifelike}
               />
             )
           }
@@ -429,9 +531,32 @@ export function CircuitDiagram({ circuit, componentStates, closed, current }: Ci
               components={unit.components}
               x={x} y={y} size={size} edge={edge}
               states={componentStates}
+              lifelike={lifelike}
             />
           )
         })}
+
+        {/* PhET Digital Multimeter overlay */}
+        {showMultimeter && (
+          <g transform="translate(380, 25)" className="phet-multimeter-overlay">
+            {/* Multimeter body */}
+            <rect x="0" y="0" width="155" height="95" rx="8" fill="#F59E0B" stroke="#B45309" strokeWidth="2" />
+            <rect x="6" y="6" width="143" height="42" rx="4" fill="#0F172A" />
+            {/* Digital Readout */}
+            <text x="18" y="26" fill="#38BDF8" fontSize="11" fontFamily="monospace" fontWeight="800">
+              V: {closed ? (voltage).toFixed(2) : '0.00'} V
+            </text>
+            <text x="18" y="42" fill="#4ADE80" fontSize="11" fontFamily="monospace" fontWeight="800">
+              I: {closed ? (current).toFixed(3) : '0.000'} A
+            </text>
+            {/* Probes indicator */}
+            <circle cx="35" cy="72" r="7" fill="#EF4444" stroke="#7F1D1D" strokeWidth="1.5" />
+            <text x="35" y="75" fill="#FFFFFF" fontSize="8" fontWeight="900" textAnchor="middle">+</text>
+            <circle cx="120" cy="72" r="7" fill="#1E293B" stroke="#000000" strokeWidth="1.5" />
+            <text x="120" y="75" fill="#FFFFFF" fontSize="8" fontWeight="900" textAnchor="middle">−</text>
+            <text x="78" y="86" fill="#78350F" fontSize="8" fontWeight="700" textAnchor="middle">DIGITAL MULTIMETER</text>
+          </g>
+        )}
 
         {/* Empty state */}
         {n === 0 && (
@@ -441,7 +566,7 @@ export function CircuitDiagram({ circuit, componentStates, closed, current }: Ci
         )}
       </svg>
 
-      {/* Hover tooltip */}
+      {/* Tooltip */}
       {tooltip && (
         <div
           className="circuit-tooltip"
@@ -472,22 +597,10 @@ export function CircuitDiagram({ circuit, componentStates, closed, current }: Ci
               <span className="tt-value">{tooltip.state.current.toFixed(3)} A</span>
             </div>
           )}
-          {tooltip.state?.voltage !== null && tooltip.state?.voltage !== undefined && (
-            <div className="tt-row">
-              <span className="tt-label">V across</span>
-              <span className="tt-value">{tooltip.state.voltage.toFixed(2)} V</span>
-            </div>
-          )}
           {tooltip.comp.type === 'bulb' && tooltip.state?.brightness !== null && (
             <div className="tt-row">
               <span className="tt-label">Brightness</span>
               <span className="tt-value">{Math.round((tooltip.state?.brightness ?? 0) * 100)}%</span>
-            </div>
-          )}
-          {tooltip.comp.state && (
-            <div className="tt-row">
-              <span className="tt-label">State</span>
-              <span className="tt-value">{tooltip.comp.state}</span>
             </div>
           )}
         </div>
@@ -495,7 +608,9 @@ export function CircuitDiagram({ circuit, componentStates, closed, current }: Ci
 
       <div className="diagram-caption">
         <span className="flow-key" />
-        {closed ? 'Current is flowing through the circuit' : 'Open switch — no current flow'}
+        {closed
+          ? `Current: ${current.toFixed(3)} A — Electrons flowing dynamically`
+          : 'Switch OPEN — Circuit broken (0.000 A)'}
       </div>
     </div>
   )

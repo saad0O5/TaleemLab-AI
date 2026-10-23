@@ -1,7 +1,7 @@
 {
-  "name": "TaleemLab — AI Circuit Simulator",
+  "name": "TaleemLab — Matric Practical Science Lab",
   "short_name": "TaleemLab",
-  "description": "AI-powered virtual physics lab that transforms hand-drawn DC circuit diagrams into interactive simulations.",
+  "description": "AI-powered Matriculation science practical suite for Physics, Chemistry, Biology, and Computer Science (Grades 9-10).",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7f9fc",
