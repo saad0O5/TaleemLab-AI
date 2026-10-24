@@ -36,7 +36,14 @@ export function TopBar({
 
   return (
     <header className="topbar">
-      <div className="brand">
+      <div
+        className="brand"
+        onClick={() => onStepClick?.(0)}
+        style={{ cursor: onStepClick ? 'pointer' : 'default' }}
+        title="Return to Dashboard / ڈیش بورڈ پر جائیں"
+        role={onStepClick ? 'button' : undefined}
+        tabIndex={onStepClick ? 0 : undefined}
+      >
         <span className="brand-mark">
           <Icon type="flask" size={16} />
         </span>

@@ -15,14 +15,16 @@ const { handleAskAI } = require("./routes/askAI");
 const PORT = process.env.PORT || 4000;
 
 // ─── CORS Allowlist ──────────────────────────────────────────────────
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:3000")
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3001")
   .split(",")
   .map(s => s.trim())
   .filter(Boolean);
 
 function getCorsOrigin(req) {
   const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) return origin;
+  if (!origin) return "*";
+  if (ALLOWED_ORIGINS.includes(origin) || origin.endsWith(".vercel.app")) return origin;
+  if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) return origin;
   return ALLOWED_ORIGINS[0] || "*";
 }
 

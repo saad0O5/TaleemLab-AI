@@ -84,8 +84,8 @@ export function useExperiment() {
   const [commandMessage, setCommandMessage] = useState('')
   const [selectedExample, setSelectedExample] = useState<ExampleKey | 'custom'>('clean_circuit')
 
-  const [circuit, setCircuit] = useState<CircuitData | null>(null)
-  const [solverResult, setSolverResult] = useState<SolverResult | null>(null)
+  const [circuit, setCircuit] = useState<CircuitData | null>(() => mockCircuitExamples.clean_circuit)
+  const [solverResult, setSolverResult] = useState<SolverResult | null>(() => solveCircuit(mockCircuitExamples.clean_circuit))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [cameraOpen, setCameraOpen] = useState(false)
