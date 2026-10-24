@@ -102,7 +102,7 @@ function AppContent() {
             language={exp.language}
             onToggleLanguage={toggleLanguage}
           />
-          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} />
+          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} language={exp.language} />
         </>
       )}
 
@@ -114,7 +114,7 @@ function AppContent() {
             language={exp.language}
             onToggleLanguage={toggleLanguage}
           />
-          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} />
+          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} language={exp.language} />
         </>
       )}
 
@@ -125,9 +125,10 @@ function AppContent() {
             studentModel={exp.studentModel}
             buildStudentProfile={exp.buildStudentProfile}
             onViewChange={exp.setView}
+            onSubjectChange={exp.setSubject}
             onStepClick={onStepClick}
           />
-          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} />
+          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} language={exp.language} />
         </>
       )}
 
@@ -138,8 +139,10 @@ function AppContent() {
             studentProfile={exp.buildStudentProfile()}
             onViewChange={exp.setView}
             onStepClick={onStepClick}
+            language={exp.language}
+            onToggleLanguage={toggleLanguage}
           />
-          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} />
+          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} language={exp.language} />
         </>
       )}
 
@@ -163,7 +166,7 @@ function AppContent() {
             language={exp.language}
             onToggleLanguage={toggleLanguage}
           />
-          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} />
+          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} language={exp.language} />
         </>
       )}
 
@@ -179,6 +182,8 @@ function AppContent() {
           onViewChange={exp.setView}
           onContinueToSimulate={exp.handleContinueToSimulate}
           onStepClick={onStepClick}
+          language={exp.language}
+          onToggleLanguage={toggleLanguage}
         />
       )}
 
@@ -282,7 +287,7 @@ function AppContent() {
             </div>
           )}
 
-          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} />
+          <BottomNavBar currentView={exp.view} onViewChange={exp.setView} language={exp.language} />
         </>
       )}
     </>

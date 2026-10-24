@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '../icons/Icon'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { useToast } from '../ui/Toast'
+import { recordPrediction } from '../../lib/studentModel'
 
 type Indicator = 'phenolphthalein' | 'litmus'
 
@@ -104,6 +105,13 @@ export function ChemistryLab({ onSwitchSubject, onBackToWelcome }: ChemistryLabP
         text: `Notice that titration has an equivalence point! Below 25mL, acid dominates. But passing 25mL creates excess base, instantly changing the indicator color.`
       })
     }
+
+    recordPrediction({
+      concept: 'titration',
+      correct,
+      timestamp: Date.now(),
+      subject: 'chemistry',
+    })
 
     setBaseAdded(prediction.targetBase)
     setPrediction(null)

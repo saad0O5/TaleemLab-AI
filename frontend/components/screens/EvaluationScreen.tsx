@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { View } from '../../lib/types'
+import { View, Language } from '../../lib/types'
 import { getEvaluation, StudentProfileForAI, AIEvaluation } from '../../lib/api'
 import { Icon } from '../icons/Icon'
 import { TopBar } from '../ui/TopBar'
@@ -10,9 +10,17 @@ interface EvaluationScreenProps {
   studentProfile: StudentProfileForAI
   onViewChange: (view: View) => void
   onStepClick?: (step: number) => void
+  language?: Language
+  onToggleLanguage?: () => void
 }
 
-export function EvaluationScreen({ studentProfile, onViewChange, onStepClick }: EvaluationScreenProps) {
+export function EvaluationScreen({
+  studentProfile,
+  onViewChange,
+  onStepClick,
+  language = 'en',
+  onToggleLanguage
+}: EvaluationScreenProps) {
   const [evaluation, setEvaluation] = useState<AIEvaluation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -61,8 +69,14 @@ export function EvaluationScreen({ studentProfile, onViewChange, onStepClick }: 
   }
 
   return (
-    <main className="page-shell">
-      <TopBar step={5} onStepClick={onStepClick} currentView="evaluation" />
+    <main className="page-shell" style={{ paddingBottom: '90px' }}>
+      <TopBar
+        step={5}
+        onStepClick={onStepClick}
+        currentView="evaluation"
+        language={language}
+        onToggleLanguage={onToggleLanguage}
+      />
       <div className="evaluation-layout">
         {/* Back link */}
         <button className="btn-text" onClick={() => onViewChange('progress')}>
@@ -92,8 +106,8 @@ export function EvaluationScreen({ studentProfile, onViewChange, onStepClick }: 
             <div className="empty-state-icon">
               <Icon type="alert" size={32} />
             </div>
-            <h2>AI evaluation temporarily unavailable</h2>
-            <p>The AI tutor couldn't generate your evaluation. This might be due to a network issue or service limit. Your progress data is safe.</p>
+            <h2>Offline Reasoning Active</h2>
+            <p>Remote cloud analysis is offline, but your experimental predictions and local scientific mastery data are completely safe and tracked in Analytics.</p>
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
               <button className="btn btn-primary" onClick={fetchEvaluation}>
                 Retry

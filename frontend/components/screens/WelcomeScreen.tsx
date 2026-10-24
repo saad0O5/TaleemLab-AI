@@ -139,15 +139,6 @@ export function WelcomeScreen({
               </div>
             </div>
 
-            {/* Hidden file input */}
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              onChange={onFileChange}
-            />
-
             {/* Action Buttons */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button className="btn btn-success" onClick={onCapture} disabled={loading}>

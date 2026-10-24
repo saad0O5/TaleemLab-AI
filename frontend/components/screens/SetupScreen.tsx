@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CircuitData, SolverResult, View, EducationalContext } from '../../lib/types'
+import { CircuitData, SolverResult, View, EducationalContext, Language } from '../../lib/types'
 import { TopBar } from '../ui/TopBar'
 import { Icon } from '../icons/Icon'
 
@@ -20,9 +20,23 @@ interface SetupScreenProps {
   onViewChange: (view: View) => void
   onContinueToSimulate: () => void
   onStepClick?: (step: number) => void
+  language?: Language
+  onToggleLanguage?: () => void
 }
 
-export function SetupScreen({ circuit, solverResult, error, onUpdateComponentValue, onAddBattery, onAutoCompleteCircuit, onViewChange, onContinueToSimulate, onStepClick }: SetupScreenProps) {
+export function SetupScreen({
+  circuit,
+  solverResult,
+  error,
+  onUpdateComponentValue,
+  onAddBattery,
+  onAutoCompleteCircuit,
+  onViewChange,
+  onContinueToSimulate,
+  onStepClick,
+  language = 'en',
+  onToggleLanguage
+}: SetupScreenProps) {
   const flags = solverResult?.flags || []
   const hasPolarityUnset = flags.some(f => f === 'battery_polarity_unset')
   const hasNoBattery = flags.some(f => f === 'no_battery_detected')
@@ -55,8 +69,14 @@ export function SetupScreen({ circuit, solverResult, error, onUpdateComponentVal
   }, [circuit, eduCtx, hasNoBattery, hasIncomplete, hasPolarityUnset, hasOutOfRange])
 
   return (
-    <main className="page-shell">
-      <TopBar step={2} onStepClick={onStepClick} currentView="confirm" />
+    <main className="page-shell" style={{ paddingBottom: '90px' }}>
+      <TopBar
+        step={2}
+        onStepClick={onStepClick}
+        currentView="confirm"
+        language={language}
+        onToggleLanguage={onToggleLanguage}
+      />
 
       <div className="page-header">
         <p className="eyebrow">Step 2 of 4</p>

@@ -628,22 +628,29 @@ export function getEvidenceSummary(model: StudentModel, limit = 5): string[] {
   })
 }
 
-const CONCEPT_LABELS: Record<ConceptId, string> = {
+const CONCEPT_LABELS: Record<string, string> = {
   resistance: 'Resistance',
   voltage: 'Voltage',
   state: 'Switch / Circuit State',
+  titration: 'Acid-Base Titration',
+  genetics: 'Punnett Genetics',
+  logic_gates: 'Logic Gates',
+  binary: 'Binary System',
 }
 
-export function getConceptLabel(id: ConceptId): string {
+export function getConceptLabel(id: string): string {
   return CONCEPT_LABELS[id] || id
 }
 
 // ─── Prediction Tracking (merged from progressTracker.ts) ────────────
 
+export type PredictionConcept = 'resistance' | 'voltage' | 'state' | 'titration' | 'genetics' | 'logic_gates' | 'binary'
+
 export interface PredictionEntry {
-  concept: 'resistance' | 'voltage' | 'state'
+  concept: PredictionConcept
   correct: boolean
   timestamp: number
+  subject?: 'physics' | 'chemistry' | 'biology' | 'computer'
 }
 
 const PREDICTIONS_KEY = 'taleemlab_predictions'

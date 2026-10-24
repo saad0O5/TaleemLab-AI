@@ -461,9 +461,10 @@ export function CircuitDiagram({ circuit, componentStates, closed, current, volt
         {/* Subtle background */}
         <rect x="2" y="2" width="556" height="306" rx="12" fill="var(--surface-soft)" stroke="var(--border)" strokeWidth="1" opacity="0.6" />
 
-        {/* Wire paths */}
+        {/* Wire paths & smooth continuous orbit for electron animation */}
         <defs>
           <path id="wire-loop" d={wireSegments.join(' ')} />
+          <path id="electron-orbit" d={`M ${RECT.x1} ${RECT.y1} H ${RECT.x2} V ${RECT.y2} H ${RECT.x1} Z`} fill="none" />
           <filter id="phetGlow">
             <feGaussianBlur stdDeviation="3" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
@@ -495,7 +496,7 @@ export function CircuitDiagram({ circuit, componentStates, closed, current, volt
           )
         })}
 
-        {/* PhET Moving Blue Electrons */}
+        {/* PhET Moving Blue Electrons (Smooth continuous orbit around full circuit) */}
         {showElectrons && closed && current > 0 && electronOffsets.map((offset, i) => (
           <g key={`electron-${i}`}>
             <circle r="4.5" fill="#38BDF8" stroke="#0284C7" strokeWidth="1" filter="url(#phetGlow)">
@@ -504,7 +505,7 @@ export function CircuitDiagram({ circuit, componentStates, closed, current, volt
                 repeatCount="indefinite"
                 begin={`${offset * animDuration}s`}
               >
-                <mpath href="#wire-loop" />
+                <mpath href="#electron-orbit" />
               </animateMotion>
             </circle>
           </g>

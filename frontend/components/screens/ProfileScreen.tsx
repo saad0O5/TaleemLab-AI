@@ -22,6 +22,11 @@ export function ProfileScreen({ onViewChange, language = 'en', onToggleLanguage 
 
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains('dark'))
+    const savedBoard = localStorage.getItem('taleemlab_student_board')
+    if (savedBoard) setBoard(savedBoard)
+    const savedGrade = localStorage.getItem('taleemlab_student_grade')
+    if (savedGrade) setGrade(savedGrade)
+
     const entries = getPredictions()
     setPredictionCount(entries.length)
     const correct = entries.filter(e => e.correct).length
@@ -33,6 +38,18 @@ export function ProfileScreen({ onViewChange, language = 'en', onToggleLanguage 
     ).size
     setStreakDays(distinctDays > 0 ? distinctDays : (entries.length > 0 ? 1 : 0))
   }, [])
+
+  const handleBoardChange = (newBoard: string) => {
+    setBoard(newBoard)
+    localStorage.setItem('taleemlab_student_board', newBoard)
+    addToast('success', `Academic board set to ${newBoard}`)
+  }
+
+  const handleGradeChange = (newGrade: string) => {
+    setGrade(newGrade)
+    localStorage.setItem('taleemlab_student_grade', newGrade)
+    addToast('success', `Class set to ${newGrade}`)
+  }
 
   const toggleTheme = () => {
     const html = document.documentElement
@@ -48,7 +65,7 @@ export function ProfileScreen({ onViewChange, language = 'en', onToggleLanguage 
       setPredictionCount(0)
       setAccuracy(0)
       setStreakDays(0)
-      addToast('History and predictions reset', 'info')
+      addToast('info', 'History and predictions reset')
     }
   }
 
@@ -105,7 +122,7 @@ export function ProfileScreen({ onViewChange, language = 'en', onToggleLanguage 
           <select
             className="setting-select"
             value={board}
-            onChange={(e) => setBoard(e.target.value)}
+            onChange={(e) => handleBoardChange(e.target.value)}
           >
             <option>Federal Board (FBISE)</option>
             <option>Sindh Board (BIEK/BSEK)</option>
@@ -119,7 +136,7 @@ export function ProfileScreen({ onViewChange, language = 'en', onToggleLanguage 
           <select
             className="setting-select"
             value={grade}
-            onChange={(e) => setGrade(e.target.value)}
+            onChange={(e) => handleGradeChange(e.target.value)}
           >
             <option>Grade 9 (SSC Part-I)</option>
             <option>Grade 10 (SSC Part-II)</option>

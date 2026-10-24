@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '../icons/Icon'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { useToast } from '../ui/Toast'
+import { recordPrediction } from '../../lib/studentModel'
 
 type GateType = 'AND' | 'OR' | 'NOT' | 'NAND' | 'NOR' | 'XOR' | 'XNOR'
 type ComputerModule = 'gates' | 'half_adder' | 'binary_board'
@@ -215,6 +216,13 @@ export function ComputerLab({ onSwitchSubject, onBackToWelcome }: ComputerLabPro
       newBits[4] = 1 // bit index 4 is 2^3 = 8
       setBits(newBits)
     }
+
+    recordPrediction({
+      concept: prediction.type === 'binary' ? 'binary' : 'logic_gates',
+      correct: isCorrect,
+      timestamp: Date.now(),
+      subject: 'computer',
+    })
 
     setPrediction(null)
   }

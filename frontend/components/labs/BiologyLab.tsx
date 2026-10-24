@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '../icons/Icon'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { useToast } from '../ui/Toast'
+import { recordPrediction } from '../../lib/studentModel'
 
 interface BiologyLabProps {
   onSwitchSubject?: (sub: 'physics' | 'chemistry' | 'biology' | 'computer') => void
@@ -91,6 +92,13 @@ export function BiologyLab({ onSwitchSubject, onBackToWelcome }: BiologyLabProps
         text: "Important distinction: A 25% chance means each baby has a 1 in 4 chance. Just like flipping tails twice in a row, real families can have 4 brown-eyed or 4 blue-eyed children by chance!"
       })
     }
+    recordPrediction({
+      concept: 'genetics',
+      correct: isCorrect,
+      timestamp: Date.now(),
+      subject: 'biology',
+    })
+
     setPrediction(null)
     generateTrial()
   }

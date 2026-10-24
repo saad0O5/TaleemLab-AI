@@ -14,10 +14,11 @@ interface ProgressScreenProps {
   studentModel: StudentModel
   buildStudentProfile: () => StudentProfileForAI
   onViewChange: (view: View) => void
+  onSubjectChange?: (sub: 'physics' | 'chemistry' | 'biology' | 'computer') => void
   onStepClick?: (step: number) => void
 }
 
-export function ProgressScreen({ studentModel, buildStudentProfile, onViewChange }: ProgressScreenProps) {
+export function ProgressScreen({ studentModel, buildStudentProfile, onViewChange, onSubjectChange }: ProgressScreenProps) {
   const [summary, setSummary] = useState<string | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [summaryIsAI, setSummaryIsAI] = useState(false)
@@ -75,49 +76,77 @@ export function ProgressScreen({ studentModel, buildStudentProfile, onViewChange
     }
   })
 
-  // Real Subject status
+  // Split entries by subject for accurate metrics
+  const physicsEntries = entries.filter(e => e.subject === 'physics' || (!e.subject && ['resistance', 'voltage', 'state'].includes(e.concept)))
+  const chemistryEntries = entries.filter(e => e.subject === 'chemistry' || e.concept === 'titration')
+  const biologyEntries = entries.filter(e => e.subject === 'biology' || e.concept === 'genetics')
+  const computerEntries = entries.filter(e => e.subject === 'computer' || ['logic_gates', 'binary'].includes(e.concept))
+
+  const getSubStats = (list: PredictionEntry[], defaultReadyMsg: string) => {
+    if (list.length === 0) return { status: defaultReadyMsg, percent: 0 }
+    const correct = list.filter(e => e.correct).length
+    const pct = Math.round((correct / list.length) * 100)
+    return { status: `${list.length} predictions (${pct}% accuracy)`, percent: pct }
+  }
+
+  const physStats = getSubStats(physicsEntries, 'Not started (0 predictions)')
+  const chemStats = getSubStats(chemistryEntries, 'Interactive titration lab ready')
+  const bioStats = getSubStats(biologyEntries, 'Monohybrid cross simulation ready')
+  const compStats = getSubStats(computerEntries, 'Digital gates verification ready')
+
+  // Real Subject status with dynamic progress and subject switching
   const subjectsData = [
     {
       name: 'Physics',
       slo: 'SLO: P-09-F-14 · Ohm’s Law & DC Circuits',
       symbol: '⚡',
-      status: totalPredictions > 0 
-        ? `${totalPredictions} predictions (${accuracy}% accuracy)` 
-        : 'Not started (0 predictions)',
-      percent: accuracy,
+      status: physStats.status,
+      percent: physStats.percent,
       barColor: '#F59E0B',
-      iconBg: '#FFFBEB',
-      action: () => onViewChange('simulate'),
+      iconBg: 'rgba(245, 158, 11, 0.15)',
+      action: () => {
+        onSubjectChange?.('physics')
+        onViewChange('simulate')
+      },
     },
     {
       name: 'Chemistry',
       slo: 'SLO: C-10-B-13 · Acid-Base Volumetric Titration',
       symbol: '🧪',
-      status: 'Interactive titration lab ready',
-      percent: 0,
+      status: chemStats.status,
+      percent: chemStats.percent,
       barColor: '#EF4444',
-      iconBg: '#FEF2F2',
-      action: () => onViewChange('simulate'),
+      iconBg: 'rgba(239, 68, 68, 0.15)',
+      action: () => {
+        onSubjectChange?.('chemistry')
+        onViewChange('simulate')
+      },
     },
     {
       name: 'Biology',
       slo: 'SLO: B-09-10-X-02 · Genetics & Punnett Square',
       symbol: '🧬',
-      status: 'Monohybrid cross simulation ready',
-      percent: 0,
+      status: bioStats.status,
+      percent: bioStats.percent,
       barColor: '#10B981',
-      iconBg: '#ECFDF5',
-      action: () => onViewChange('simulate'),
+      iconBg: 'rgba(16, 185, 129, 0.15)',
+      action: () => {
+        onSubjectChange?.('biology')
+        onViewChange('simulate')
+      },
     },
     {
       name: 'Computer Science',
       slo: 'SLO: CS-09-10 · Logic Gates & Truth Tables',
       symbol: '💻',
-      status: 'Digital gates verification ready',
-      percent: 0,
+      status: compStats.status,
+      percent: compStats.percent,
       barColor: '#2A115B',
-      iconBg: '#F3EEFB',
-      action: () => onViewChange('simulate'),
+      iconBg: 'rgba(42, 17, 91, 0.15)',
+      action: () => {
+        onSubjectChange?.('computer')
+        onViewChange('simulate')
+      },
     },
   ]
 
